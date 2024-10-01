@@ -167,6 +167,33 @@ void CHudHealth::GetPainColor(int& r, int& g, int& b)
 
 bool CHudHealth::Draw(float flTime)
 {
+	// Si le temps d'affichage du message passif n'est pas encore écoulé
+	if (m_flPassiveDisplayTime > flTime)
+	{
+		// Séparer le texte en plusieurs parties (en fonction du séparateur "|")
+		char textCopy[512];
+		strcpy(textCopy, m_szPassiveMessage); // Créer une copie pour manipuler la chaîne
+		char* token = strtok(textCopy, "|");
+
+		// Afficher chaque partie du message séparément sur le 
+		int x = 10;
+		int y = 50;
+
+		while (token != NULL)
+		{
+			// Vérifier si le passif est un bonus ou un malus
+			if (strncmp(token, "Bonus", 5) == 0)
+				gEngfuncs.pfnDrawString(x, y, token, 10, 200, 10);
+			else if (strncmp(token, "Malus", 5) == 0)
+				gEngfuncs.pfnDrawString(x, y, token, 200, 10, 10);
+			else
+				gEngfuncs.pfnDrawString(x, y, token, 200, 200, 200);
+
+			y += 30;				   // Décaler verticalement pour le prochain texte
+			token = strtok(NULL, "|"); // Passer à la prochaine partie
+		}
+	}
+
 	int r, g, b;
 	int a = 0, x, y;
 	int HealthWidth;

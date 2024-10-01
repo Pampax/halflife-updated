@@ -22,6 +22,7 @@
 
 #include <limits>
 #include <algorithm>
+#include <vector>
 
 #include "extdll.h"
 #include "util.h"
@@ -42,12 +43,16 @@
 #include "UserMessages.h"
 #include "client.h"
 
+
+
 // #define DUCKFIX
 
 extern void CopyToBodyQue(entvars_t* pev);
 extern edict_t* EntSelectSpawnPoint(CBaseEntity* pPlayer);
 
 extern bool IsBustingGame();
+
+PlayerAttributes m_PlayerAttributes; // Définition de la variable globale
 
 #define TRAIN_ACTIVE 0x80
 #define TRAIN_NEW 0xc0
@@ -1591,6 +1596,278 @@ void CBasePlayer::PlayerUse()
 	}
 }
 
+void CBasePlayer::ResetAttributes()
+{
+	// Réinitialiser les niveaux de chaque attribut
+	m_PlayerAttributes.healthLevel = 0;
+	m_PlayerAttributes.noiseLevel = 0;
+	m_PlayerAttributes.sizeLevel = 0;
+	m_PlayerAttributes.speedLevel = 0;
+}
+
+
+void CBasePlayer::DelayedAssignRandomPassives()
+{
+	// Appelle AssignRandomPassives avec les arguments stockés
+	AssignRandomPassives(m_iTotalPositivePA, m_iTotalNegativePA);
+}
+
+void CBasePlayer::AssignRandomPassives(int totalPositivePA, int totalNegativePA)
+{
+	// Chaînes temporaires pour stocker les bonus et malus
+	std::string bonusStr;
+	std::string malusStr;
+
+	m_iTotalPositivePA = totalPositivePA;
+	m_iTotalNegativePA = totalNegativePA;
+
+	// Créer une liste des passifs disponibles
+	std::vector<PlayerPassive> availablePassives = {
+		BONUS_MAX_HEALTH_UP, BONUS_NOISE_DOWN, BONUS_SIZE_DOWN, BONUS_SPEED_UP,
+		BONUS_REGEN, BONUS_FURTIF, BONUS_ARMOR, BONUS_DOUBLE_JUMP,
+		BONUS_FAST_RELOAD, BONUS_FIRE_RATE, BONUS_LOW_RECOIL,
+		MALUS_MAX_HEALTH_DOWN, MALUS_NOISE_UP, MALUS_SIZE_UP,
+		MALUS_SPEED_DOWN, MALUS_BLEED, MALUS_LOW_RELOAD,
+		MALUS_FIRE_RATE, MALUS_SLOW_MOVE_ON_HIT, MALUS_HIGH_RECOIL, MALUS_SICK_SOUNDS};
+
+	while ((totalPositivePA > 0 || totalNegativePA > 0) && !availablePassives.empty())
+	{
+		// Sélectionner un passif aléatoire parmi ceux disponibles
+		int randomIndex = RANDOM_LONG(0, availablePassives.size() - 1);
+		PlayerPassive selectedPassive = availablePassives[randomIndex];
+
+		bool wasPassiveApplied = false;
+
+		// Appliquer le passif au joueur en fonction de la nature du passif (bonus ou malus)
+		if (IsBonusPassive(selectedPassive) && totalPositivePA > 0)
+		{
+			totalPositivePA -= ApplyPassif(selectedPassive, totalPositivePA, bonusStr, malusStr);
+			wasPassiveApplied = true;
+		}
+		else if (!IsBonusPassive(selectedPassive) && totalNegativePA > 0)
+		{
+			totalNegativePA -= ApplyPassif(selectedPassive, totalNegativePA, bonusStr, malusStr);
+			wasPassiveApplied = true;
+		}
+
+		// Retirer le passif attribué de la liste des passifs disponibles
+		availablePassives.erase(availablePassives.begin() + randomIndex);
+
+		if (wasPassiveApplied)
+		{
+			// Retirer également son opposé (s'il existe et s'il a été appliqué)
+			PlayerPassive oppositePassive = GetOppositePassive(selectedPassive);
+			if (oppositePassive != PASSIVE_NONE)
+			{
+				// Trouver l'opposé dans la liste et le retirer
+				auto it = std::find(availablePassives.begin(), availablePassives.end(), oppositePassive);
+				if (it != availablePassives.end())
+					availablePassives.erase(it);
+			}
+		}
+	}
+
+	// Après avoir assigné tous les passifs, on peut les concaténer dans SendPassiveInfo
+	m_combinedMessage = bonusStr + malusStr;
+
+	if (pev->flags & FL_CLIENT) // Vérifie que l'entité est bien un client
+	{
+		// Envoie le message réseau au client
+		if (gmsgPlayerPassive > 0)
+		{
+			// Si c'est le premier spawn (à la connexion du joueur)
+			if (m_bFirstSpawn)
+			{
+				// Timer pour envoyer le passif après une seconde
+				m_flNextPassiveUpdate = gpGlobals->time + 1.0; // Timer de 1 seconde
+				m_bFirstSpawn = false;						   // Marquer que le joueur a fait son premier spawn
+			}
+			else
+			{
+				// Appelle directement SendPassiveInfo sans délai pour les spawns suivants
+				SendPassiveInfo();
+			}
+		}
+	}
+	else
+	{
+		// Si le joueur n'est pas encore prêt, réessayer plus tard
+		SetThink(&CBasePlayer::DelayedAssignRandomPassives);
+		pev->nextthink = gpGlobals->time + 0.5; // Réessaye dans 0,5 seconde
+	}
+}
+
+// Fonction auxiliaire pour déterminer si un passif est un bonus
+bool CBasePlayer::IsBonusPassive(PlayerPassive passive)
+{
+	return passive >= BONUS_MAX_HEALTH_UP && passive <= BONUS_LOW_RECOIL;
+}
+
+// Appliquer un passif au joueur
+int CBasePlayer::ApplyPassif(PlayerPassive passive, int availablePA, std::string& bonusStr, std::string& malusStr)
+{
+	// Déterminer un incrément aléatoire entre 1 et max 3 en fonction du nombre de PA restants a attribuer
+	int increment = RANDOM_LONG(1, std::min(availablePA, 3));
+
+	switch (passive)
+	{
+	case BONUS_MAX_HEALTH_UP:
+		m_PlayerAttributes.healthLevel = std::min(m_PlayerAttributes.healthLevel + increment, 3);
+		bonusStr += "Bonus: Sante augmentee lvl. " + std::to_string(increment) + "|";
+		return increment;
+	case MALUS_MAX_HEALTH_DOWN:
+		m_PlayerAttributes.healthLevel = - std::min(m_PlayerAttributes.healthLevel + increment, 3);
+		malusStr += "Malus: Sante diminuee lvl. " + std::to_string(increment) + "|";
+		return increment;
+	case BONUS_SPEED_UP:
+		m_PlayerAttributes.speedLevel = std::min(m_PlayerAttributes.speedLevel + increment, 3);
+		bonusStr += "Bonus: Vitesse augmentee lvl. " + std::to_string(increment) + "|";
+		return increment;
+	case MALUS_SPEED_DOWN:
+		m_PlayerAttributes.speedLevel = - std::min(m_PlayerAttributes.speedLevel + increment, 3);
+		malusStr += "Malus: Vitesse diminuee lvl. " + std::to_string(increment) + "|";
+		return increment;
+	case BONUS_NOISE_DOWN:
+		m_PlayerAttributes.noiseLevel = - std::min(m_PlayerAttributes.noiseLevel + increment, 3);
+		bonusStr += "Bonus: Bruit diminuee lvl. " + std::to_string(increment) + "|";
+		return increment;
+	case MALUS_NOISE_UP:
+		m_PlayerAttributes.noiseLevel = std::min(m_PlayerAttributes.noiseLevel + increment, 3);
+		malusStr += "Malus: Bruit augmente lvl. " + std::to_string(increment) + "|";
+		return increment;
+	case MALUS_SIZE_UP:
+		m_PlayerAttributes.sizeLevel = std::min(m_PlayerAttributes.sizeLevel + increment, 3);
+		malusStr += "Malus: Taille augmentee lvl. " + std::to_string(increment) + "|";
+		return increment;
+	case BONUS_SIZE_DOWN:
+		m_PlayerAttributes.sizeLevel = - std::min(m_PlayerAttributes.sizeLevel + increment, 3);
+		bonusStr += "Bonus: Taille diminuee lvl. " + std::to_string(increment) + "|";
+		return increment;
+	default:
+		ALERT(at_console, "SERVEUR : Passif %d non implemente\n", passive);
+		return 0;
+	}
+}
+
+
+PlayerPassive CBasePlayer::GetOppositePassive(PlayerPassive passive)
+{
+	switch (passive)
+	{
+		case BONUS_MAX_HEALTH_UP: return MALUS_MAX_HEALTH_DOWN;
+		case BONUS_SPEED_UP: return MALUS_SPEED_DOWN;
+		case BONUS_NOISE_DOWN: return MALUS_NOISE_UP;
+		case BONUS_SIZE_DOWN: return MALUS_SIZE_UP;
+		case BONUS_REGEN: return MALUS_BLEED;
+		case MALUS_MAX_HEALTH_DOWN: return BONUS_MAX_HEALTH_UP;
+		case MALUS_SPEED_DOWN: return BONUS_SPEED_UP;
+		case MALUS_NOISE_UP: return BONUS_NOISE_DOWN;
+		case MALUS_SIZE_UP: return BONUS_SIZE_DOWN;
+		case MALUS_BLEED: return BONUS_REGEN;
+		default: return PASSIVE_NONE; // Aucun opposé pour ce passif
+	}
+}
+
+void CBasePlayer::SendPassiveInfo()
+{
+	// Utiliser la chaîne stockée dans m_combinedMessage pour envoyer les passifs au client
+	MESSAGE_BEGIN(MSG_ONE, gmsgPlayerPassive, NULL, pev);
+	WRITE_STRING(m_combinedMessage.c_str()); // Envoyer le texte concaténé au client
+	MESSAGE_END();
+
+	std::string logMessage = "SERVEUR : Passifs envoyes au joueur : " + m_combinedMessage;
+	ALERT(at_console, logMessage.c_str());
+}
+
+void CBasePlayer::ApplyPassiveEffects()
+{
+	// Appliquer l'effet de la santé
+	switch (m_PlayerAttributes.healthLevel)
+	{
+		case -3:
+			pev->max_health = 20;
+			pev->health = 20;
+			break;
+		case -2:
+			pev->max_health = 60;
+			pev->health = 60;
+			break;
+		case -1:
+			pev->max_health = 80;
+			pev->health = 80;
+			break;
+		case 0:
+			pev->max_health = 100;
+			pev->health = 100;
+			break;
+		case 1:
+			pev->max_health = 150;
+			pev->health = 150;
+			break;
+		case 2:
+			pev->max_health = 200;
+			pev->health = 200;
+			break;
+		case 3:
+			pev->max_health = 300;
+			pev->health = 300;
+			break;
+		default:
+			ALERT(at_console, "Valeur attribut innatendue, %d", m_PlayerAttributes.healthLevel);
+			break;
+	}
+
+	switch (m_PlayerAttributes.speedLevel)
+	{
+		case -3:
+			pev->maxspeed = 180;
+			break;
+		case -2:
+			pev->maxspeed = 220;
+			break;
+		case -1:
+			pev->maxspeed = 250;
+			break;
+		case 0:
+			pev->maxspeed = 270;
+			break;
+		case 1:
+			pev->maxspeed = 3500;
+			break;
+		case 2:
+			pev->maxspeed = 5500;
+			break;
+		case 3:
+			pev->maxspeed = 9000;
+			break;
+		default:
+			ALERT(at_console, "Valeur attribut innatendue, %d", m_PlayerAttributes.speedLevel);
+			break;
+	}
+
+	// Appliquer l'effet de la taille de la hitbox (taille du joueur)
+	if (m_PlayerAttributes.sizeLevel > 0)
+	{
+		//TODO
+	}
+	else if (m_PlayerAttributes.sizeLevel < 0)
+	{
+		//TODO
+	}
+
+	// Appliquer l'effet du bruit
+	if (m_PlayerAttributes.noiseLevel > 0)
+	{
+		//TODO
+	}
+	else if (m_PlayerAttributes.noiseLevel < 0)
+	{
+		//TODO
+	}
+
+	//TODO les autres attributs
+}
+
 
 
 void CBasePlayer::Jump()
@@ -1835,13 +2112,11 @@ void CBasePlayer::UpdateStatusBar()
 	}
 }
 
-
-
-
-
-
-
-
+bool IsVectorZero(const Vector& vec)
+{
+	const float epsilon = 0.0001f; // Tolérance pour les erreurs de calcul en flottants
+	return (fabs(vec.x) < epsilon && fabs(vec.y) < epsilon && fabs(vec.z) < epsilon);
+}
 
 #define CLIMB_SHAKE_FREQUENCY 22 // how many frames in between screen shakes when climbing
 #define MAX_CLIMB_SPEED 200		 // fastest vertical climbing speed possible
@@ -1859,6 +2134,16 @@ void CBasePlayer::PreThink()
 	m_afButtonReleased = buttonsChanged & (~pev->button); // The ones not down are "released"
 
 	g_pGameRules->PlayerThink(this);
+
+	// Vérifier si c'est après le premier spawn et que le délai est écoulé
+	if (m_flNextPassiveUpdate > 0 && gpGlobals->time > m_flNextPassiveUpdate)
+	{
+		// Envoyer le passif au joueur après le délai
+		SendPassiveInfo();
+
+		// Remettre à zéro pour ne plus envoyer après
+		m_flNextPassiveUpdate = 0.0; // Désactiver le timer
+	}
 
 	if (g_fGameOver)
 		return; // intermission or finale
@@ -2022,6 +2307,40 @@ void CBasePlayer::PreThink()
 		Jump();
 	}
 
+	/* TOTO a reprendre :
+	if (pev->flags & FL_ONGROUND) // Le joueur est au sol
+	{
+		if (pev->button & (IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT))
+		{
+			// Vitesse de marche et de course modifiées par le passif
+			float walkSpeed = pev->maxspeed * 0.6f; // Marche basée sur maxspeed
+			float runSpeed = pev->maxspeed;			// Course basée sur maxspeed
+
+			Vector moveDirection = g_vecZero;
+
+			if (pev->button & IN_FORWARD)
+				moveDirection = moveDirection + gpGlobals->v_forward; // Avancer
+			if (pev->button & IN_BACK)
+				moveDirection = moveDirection - gpGlobals->v_forward; // Reculer
+			if (pev->button & IN_MOVELEFT)
+				moveDirection = moveDirection - gpGlobals->v_right; // Aller à gauche
+			if (pev->button & IN_MOVERIGHT)
+				moveDirection = moveDirection + gpGlobals->v_right; // Aller à droite
+
+			// Normalise la direction pour éviter que le joueur aille plus vite en diagonale
+			if (!IsVectorZero(moveDirection))
+			{
+				moveDirection = moveDirection.Normalize();
+
+				float speed = (pev->button & IN_RUN) ? runSpeed : walkSpeed;
+				pev->velocity = moveDirection * speed;
+			}
+		}
+		else
+		{
+			pev->velocity = g_vecZero; // Arrête le joueur s'il n'appuie sur aucune touche
+		}
+	}*/
 
 	// If trying to duck, already ducked, or in the process of ducking
 	if ((pev->button & IN_DUCK) != 0 || FBitSet(pev->flags, FL_DUCKING) || (m_afPhysicsFlags & PFLAG_DUCKING) != 0)
@@ -2916,6 +3235,9 @@ ReturnSpot:
 
 void CBasePlayer::Spawn()
 {
+	// Réinitialiser les attributs du joueur à leurs valeurs par défaut
+	ResetAttributes();
+
 	m_flStartCharge = gpGlobals->time;
 	m_bIsSpawning = true;
 
@@ -3016,7 +3338,16 @@ void CBasePlayer::Spawn()
 
 	m_flNextChatTime = gpGlobals->time;
 
+	// Appel à la fonction parent (si nécessaire)
+	CBaseMonster::Spawn();
+
 	g_pGameRules->PlayerSpawn(this);
+
+	// Attribuer un passif aléatoire au joueur lors du respawn
+	AssignRandomPassives(2, 2);
+
+	// Appliquer les effets du passif au joueur
+	ApplyPassiveEffects();
 }
 
 

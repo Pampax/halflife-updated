@@ -133,6 +133,12 @@ int __MsgFunc_GameMode(const char* pszName, int iSize, void* pbuf)
 	return static_cast<int>(gHUD.MsgFunc_GameMode(pszName, iSize, pbuf));
 }
 
+// Déclaration de la fonction qui reçoit le message réseau
+int __MsgFunc_PPassive(const char* pszName, int iSize, void* pbuf)
+{
+	return static_cast<int>(gHUD.MsgFunc_PPassive(pszName, iSize, pbuf));
+}
+
 // TFFree Command Menu
 void __CmdFunc_OpenCommandMenu()
 {
@@ -292,6 +298,8 @@ void CHud::Init()
 	HOOK_MESSAGE(Concuss);
 	HOOK_MESSAGE(Weapons);
 
+	HOOK_MESSAGE(PPassive); // Enregistre la fonction MsgFunc_PlayerPassive pour ce message
+
 	// TFFree CommandMenu
 	HOOK_COMMAND("+commandmenu", OpenCommandMenu);
 	HOOK_COMMAND("-commandmenu", CloseCommandMenu);
@@ -401,6 +409,22 @@ CHud::~CHud()
 		m_pHudList = NULL;
 	}
 }
+
+int CHud::MsgFunc_PPassive(const char* pszName, int iSize, void* pbuf)
+{
+	BEGIN_READ(pbuf, iSize);
+	const char* message = READ_STRING(); // Récupérer le texte envoyé par le serveur
+
+	// Stocker le message dans la classe CHudHealth
+	strncpy(gHUD.m_Health.m_szPassiveMessage, message, sizeof(gHUD.m_Health.m_szPassiveMessage) - 1);
+	gHUD.m_Health.m_szPassiveMessage[sizeof(gHUD.m_Health.m_szPassiveMessage) - 1] = '\0';
+
+	// Définir un temps d'affichage de 5 secondes
+	gHUD.m_Health.m_flPassiveDisplayTime = gEngfuncs.GetClientTime() + 10.0f;
+
+	return 1;
+}
+
 
 // GetSpriteIndex()
 // searches through the sprite list loaded from hud.txt for a name matching SpriteName

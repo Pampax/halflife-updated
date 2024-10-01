@@ -16,6 +16,7 @@
 #pragma once
 
 #include "pm_materials.h"
+#include <string>
 
 
 #define PLAYER_FATAL_FALL_SPEED 1024															  // approx 60 feet
@@ -61,6 +62,44 @@
 
 #define TEAM_NAME_LENGTH 16
 
+enum PlayerPassive
+{
+	PASSIVE_NONE = 0,
+	// Bonus
+	BONUS_MAX_HEALTH_UP,
+	BONUS_NOISE_DOWN,
+	BONUS_SIZE_DOWN,
+	BONUS_SPEED_UP,
+	BONUS_REGEN,
+	BONUS_FURTIF,
+	BONUS_ARMOR,
+	BONUS_DOUBLE_JUMP,
+	BONUS_FAST_RELOAD,
+	BONUS_FIRE_RATE,
+	BONUS_LOW_RECOIL,
+	// Malus
+	MALUS_MAX_HEALTH_DOWN,
+	MALUS_NOISE_UP,
+	MALUS_SIZE_UP,
+	MALUS_SPEED_DOWN,
+	MALUS_BLEED,
+	MALUS_LOW_RELOAD,
+	MALUS_FIRE_RATE,
+	MALUS_SLOW_MOVE_ON_HIT,
+	MALUS_HIGH_RECOIL,
+	MALUS_SICK_SOUNDS,
+};
+
+struct PlayerAttributes
+{
+	int healthLevel = 0;
+	int noiseLevel = 0;
+	int sizeLevel = 0;
+	int speedLevel = 0;
+};
+
+extern PlayerAttributes m_PlayerAttributes; // Déclaration de la variable globale
+
 typedef enum
 {
 	PLAYER_IDLE,
@@ -87,6 +126,26 @@ enum sbar_data
 class CBasePlayer : public CBaseMonster
 {
 public:
+	PlayerPassive m_ePlayerPassive; // Attribut passif actuel du joueur
+	float m_flNextPassiveUpdate; 
+	bool m_bFirstSpawn = true;				// Variable pour vérifier si c'est le premier spawn
+	
+	// Déclare une variable membre pour stocker le message combiné des passifs
+	std::string m_combinedMessage;
+
+	void ResetAttributes();
+	void DelayedAssignRandomPassives();
+	void AssignRandomPassives(int totalPositivePA, int totalNegativePA); // Méthode pour attribuer un passif aléatoire
+	bool IsBonusPassive(PlayerPassive passive);
+	int ApplyPassif(PlayerPassive passive, int availablePA, std::string& bonusStr, std::string& malusStr);
+	PlayerPassive GetOppositePassive(PlayerPassive passive);
+	void ApplyPassiveEffects(); // Méthode pour appliquer les effets du passif
+	void SendPassiveInfo();	// Méthode pour envoyer le passif au client
+
+	int m_iTotalPositivePA;
+	int m_iTotalNegativePA;
+
+
 	// Spectator camera
 	void Observer_FindNextPlayer(bool bReverse);
 	void Observer_HandleButtons();
@@ -306,7 +365,6 @@ public:
 	void WaterMove();
 	void EXPORT PlayerDeathThink();
 	void PlayerUse();
-
 	void CheckSuitUpdate();
 	void SetSuitUpdate(const char* name, bool fgroup, int iNoRepeat);
 	void UpdateGeigerCounter();

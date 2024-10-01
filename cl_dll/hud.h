@@ -65,6 +65,9 @@ typedef struct cvar_s cvar_t;
 class CHudBase
 {
 public:
+	int m_iPassiveState;
+	float m_flPassiveDisplayTime; // Durée pendant laquelle le passif sera affiché
+
 	POSITION m_pos;
 	int m_type;
 	int m_iFlags; // active, moving,
@@ -510,6 +513,11 @@ public:
 	cvar_t* m_pCvarDraw;
 
 	int m_iFontHeight;
+
+	// Variable pour indiquer si le joueur a un boost de vitesse
+	bool m_flSpeedBoost;
+
+
 	int DrawHudNumber(int x, int y, int iFlags, int iNumber, int r, int g, int b);
 	int DrawHudString(int x, int y, int iMaxX, const char* szString, int r, int g, int b);
 	int DrawHudStringReverse(int xpos, int ypos, int iMinX, const char* szString, int r, int g, int b);
@@ -592,6 +600,9 @@ public:
 	bool MsgFunc_SetFOV(const char* pszName, int iSize, void* pbuf);
 	bool MsgFunc_Concuss(const char* pszName, int iSize, void* pbuf);
 	bool MsgFunc_Weapons(const char* pszName, int iSize, void* pbuf);
+
+	// Déclaration de la fonction qui reçoit le message réseau
+	int MsgFunc_PPassive(const char* pszName, int iSize, void* pbuf);
 
 	// Screen information
 	SCREENINFO m_scrinfo;

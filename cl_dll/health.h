@@ -46,6 +46,9 @@ typedef struct
 class CHudHealth : public CHudBase
 {
 public:
+	char m_szPassiveMessage[512]; // Pour stocker le message reçu
+	float m_flPassiveDisplayTime; // Durée pendant laquelle le message doit être affiché
+
 	bool Init() override;
 	bool VidInit() override;
 	bool Draw(float fTime) override;
