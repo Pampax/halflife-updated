@@ -1782,6 +1782,9 @@ void CBasePlayer::SendPassiveInfo()
 void CBasePlayer::ApplyPassiveEffects()
 {
 	// Appliquer l'effet de la santé
+	pev->max_health = 100;
+	pev->health = 100;
+
 	switch (m_PlayerAttributes.healthLevel)
 	{
 		case -3:
@@ -1795,10 +1798,6 @@ void CBasePlayer::ApplyPassiveEffects()
 		case -1:
 			pev->max_health = 80;
 			pev->health = 80;
-			break;
-		case 0:
-			pev->max_health = 100;
-			pev->health = 100;
 			break;
 		case 1:
 			pev->max_health = 150;
@@ -1817,33 +1816,43 @@ void CBasePlayer::ApplyPassiveEffects()
 			break;
 	}
 
+	// Appliquer les nouvelles valeurs via des commandes côté client
+	// 
+	// force (re)init client cvars
+	float svMaxSpeed = CVAR_GET_FLOAT("sv_maxspeed");
+	CVAR_SET_FLOAT("cl_forwardspeed", svMaxSpeed);
+	CVAR_SET_FLOAT("cl_backspeed", svMaxSpeed);
+	CVAR_SET_FLOAT("cl_sidespeed", svMaxSpeed);
+
+	int maxspeed = 270;
+
 	switch (m_PlayerAttributes.speedLevel)
 	{
 		case -3:
-			pev->maxspeed = 180;
+			maxspeed = 180;
 			break;
 		case -2:
-			pev->maxspeed = 220;
+			maxspeed = 220;
 			break;
 		case -1:
-			pev->maxspeed = 250;
-			break;
-		case 0:
-			pev->maxspeed = 270;
+			maxspeed = 250;
 			break;
 		case 1:
-			pev->maxspeed = 3500;
+			maxspeed = 400;
 			break;
 		case 2:
-			pev->maxspeed = 5500;
+			maxspeed = 600;
 			break;
 		case 3:
-			pev->maxspeed = 9000;
+			maxspeed = 1000;
 			break;
 		default:
 			ALERT(at_console, "Valeur attribut innatendue, %d", m_PlayerAttributes.speedLevel);
+			maxspeed = 270;
 			break;
 	}
+
+	pev->maxspeed = maxspeed;
 
 	// Appliquer l'effet de la taille de la hitbox (taille du joueur)
 	if (m_PlayerAttributes.sizeLevel > 0)
@@ -2306,41 +2315,6 @@ void CBasePlayer::PreThink()
 		// else Jump
 		Jump();
 	}
-
-	/* TOTO a reprendre :
-	if (pev->flags & FL_ONGROUND) // Le joueur est au sol
-	{
-		if (pev->button & (IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT))
-		{
-			// Vitesse de marche et de course modifiées par le passif
-			float walkSpeed = pev->maxspeed * 0.6f; // Marche basée sur maxspeed
-			float runSpeed = pev->maxspeed;			// Course basée sur maxspeed
-
-			Vector moveDirection = g_vecZero;
-
-			if (pev->button & IN_FORWARD)
-				moveDirection = moveDirection + gpGlobals->v_forward; // Avancer
-			if (pev->button & IN_BACK)
-				moveDirection = moveDirection - gpGlobals->v_forward; // Reculer
-			if (pev->button & IN_MOVELEFT)
-				moveDirection = moveDirection - gpGlobals->v_right; // Aller à gauche
-			if (pev->button & IN_MOVERIGHT)
-				moveDirection = moveDirection + gpGlobals->v_right; // Aller à droite
-
-			// Normalise la direction pour éviter que le joueur aille plus vite en diagonale
-			if (!IsVectorZero(moveDirection))
-			{
-				moveDirection = moveDirection.Normalize();
-
-				float speed = (pev->button & IN_RUN) ? runSpeed : walkSpeed;
-				pev->velocity = moveDirection * speed;
-			}
-		}
-		else
-		{
-			pev->velocity = g_vecZero; // Arrête le joueur s'il n'appuie sur aucune touche
-		}
-	}*/
 
 	// If trying to duck, already ducked, or in the process of ducking
 	if ((pev->button & IN_DUCK) != 0 || FBitSet(pev->flags, FL_DUCKING) || (m_afPhysicsFlags & PFLAG_DUCKING) != 0)
