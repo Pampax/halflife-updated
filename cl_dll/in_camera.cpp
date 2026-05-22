@@ -50,6 +50,7 @@ cvar_t* cam_idealyaw;
 cvar_t* cam_idealpitch;
 cvar_t* cam_idealdist;
 cvar_t* cam_contain;
+cvar_t* rr_allowthirdperson;
 
 cvar_t* c_maxpitch;
 cvar_t* c_minpitch;
@@ -432,8 +433,8 @@ void CAM_ToThirdPerson()
 #if !defined(_DEBUG)
 	if (gEngfuncs.GetMaxClients() > 1)
 	{
-		// no thirdperson in multiplayer.
-		return;
+		if (!rr_allowthirdperson || rr_allowthirdperson->value == 0.0f)
+			return;
 	}
 #endif
 
@@ -458,6 +459,15 @@ void CAM_ToFirstPerson()
 	gEngfuncs.Cvar_SetValue("cam_command", 0);
 }
 
+void CAM_RelicRushCam()
+{
+	gEngfuncs.Cvar_SetValue("rr_allowthirdperson", 1.0f);
+	if (cam_thirdperson)
+		CAM_ToFirstPerson();
+	else
+		CAM_ToThirdPerson();
+}
+
 void CAM_ToggleSnapto()
 {
 	cam_snapto->value = 0 != cam_snapto->value ? 0 : 1;
@@ -479,6 +489,7 @@ void CAM_Init()
 	gEngfuncs.pfnAddCommand("-camout", CAM_OutUp);
 	gEngfuncs.pfnAddCommand("thirdperson", CAM_ToThirdPerson);
 	gEngfuncs.pfnAddCommand("firstperson", CAM_ToFirstPerson);
+	gEngfuncs.pfnAddCommand("rr_cam", CAM_RelicRushCam);
 	gEngfuncs.pfnAddCommand("+cammousemove", CAM_StartMouseMove);
 	gEngfuncs.pfnAddCommand("-cammousemove", CAM_EndMouseMove);
 	gEngfuncs.pfnAddCommand("+camdistance", CAM_StartDistance);
@@ -491,6 +502,7 @@ void CAM_Init()
 	cam_idealpitch = gEngfuncs.pfnRegisterVariable("cam_idealpitch", "0", 0); // thirperson pitch
 	cam_idealdist = gEngfuncs.pfnRegisterVariable("cam_idealdist", "64", 0);  // thirdperson distance
 	cam_contain = gEngfuncs.pfnRegisterVariable("cam_contain", "0", 0);		  // contain camera to world
+	rr_allowthirdperson = gEngfuncs.pfnRegisterVariable("rr_allowthirdperson", "0", 0);
 
 	c_maxpitch = gEngfuncs.pfnRegisterVariable("c_maxpitch", "90.0", 0);
 	c_minpitch = gEngfuncs.pfnRegisterVariable("c_minpitch", "0.0", 0);

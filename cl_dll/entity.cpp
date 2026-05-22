@@ -145,12 +145,18 @@ void DLLEXPORT HUD_ProcessPlayerState(struct entity_state_s* dst, const struct e
 	cl_entity_t* player = gEngfuncs.GetLocalPlayer(); // Get the local player's index
 	if (dst->number == player->index)
 	{
+		extern bool g_bRelicCarrierHUD;
+		extern bool g_bRelicWallCling;
+
 		g_iPlayerClass = dst->playerclass;
 		g_iTeamNumber = dst->team;
 
 		g_iUser1 = src->iuser1;
 		g_iUser2 = src->iuser2;
 		g_iUser3 = src->iuser3;
+
+		if (g_bRelicCarrierHUD)
+			g_bRelicWallCling = (src->movetype == 5);
 	}
 }
 

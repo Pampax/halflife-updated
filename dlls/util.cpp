@@ -693,6 +693,9 @@ static short FixedSigned16(float value, float scale)
 // UNDONE: Affect user controls?
 void UTIL_ScreenShake(const Vector& center, float amplitude, float frequency, float duration, float radius)
 {
+	if (gmsgShake <= 0)
+		return;
+
 	int i;
 	float localAmplitude;
 	ScreenShake shake;
@@ -740,6 +743,34 @@ void UTIL_ScreenShake(const Vector& center, float amplitude, float frequency, fl
 void UTIL_ScreenShakeAll(const Vector& center, float amplitude, float frequency, float duration)
 {
 	UTIL_ScreenShake(center, amplitude, frequency, duration, 0);
+}
+
+void UTIL_ScreenShakeExcept(edict_t* pSkipEdict, const Vector& center, float amplitude, float frequency, float duration)
+{
+	if (gmsgShake <= 0)
+		return;
+
+	ScreenShake shake;
+
+	shake.duration = FixedUnsigned16(duration, 1 << 12);
+	shake.frequency = FixedUnsigned16(frequency, 1 << 8);
+	shake.amplitude = FixedUnsigned16(amplitude, 1 << 12);
+
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		CBaseEntity* pPlayer = UTIL_PlayerByIndex(i);
+
+		if (!pPlayer || (pPlayer->pev->flags & FL_ONGROUND) == 0)
+			continue;
+		if (pSkipEdict && pPlayer->edict() == pSkipEdict)
+			continue;
+
+		MESSAGE_BEGIN(MSG_ONE, gmsgShake, NULL, pPlayer->edict());
+		WRITE_SHORT(shake.amplitude);
+		WRITE_SHORT(shake.duration);
+		WRITE_SHORT(shake.frequency);
+		MESSAGE_END();
+	}
 }
 
 
@@ -858,6 +889,9 @@ void UTIL_HudMessageAll(const hudtextparms_t& textparms, const char* pMessage)
 
 void UTIL_ClientPrintAll(int msg_dest, const char* msg_name, const char* param1, const char* param2, const char* param3, const char* param4)
 {
+	if (gmsgTextMsg <= 0)
+		return;
+
 	MESSAGE_BEGIN(MSG_ALL, gmsgTextMsg);
 	WRITE_BYTE(msg_dest);
 	WRITE_STRING(msg_name);
@@ -876,6 +910,9 @@ void UTIL_ClientPrintAll(int msg_dest, const char* msg_name, const char* param1,
 
 void ClientPrint(entvars_t* client, int msg_dest, const char* msg_name, const char* param1, const char* param2, const char* param3, const char* param4)
 {
+	if (gmsgTextMsg <= 0)
+		return;
+
 	MESSAGE_BEGIN(MSG_ONE, gmsgTextMsg, NULL, client);
 	WRITE_BYTE(msg_dest);
 	WRITE_STRING(msg_name);

@@ -81,6 +81,7 @@ target_sources(client PRIVATE
 	GameStudioModelRenderer.cpp
 	geiger.cpp
 	health.cpp
+	relicrush_overlay.cpp
 	hud.cpp
 	hud_msg.cpp
 	hud_redraw.cpp

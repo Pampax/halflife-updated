@@ -52,6 +52,8 @@ public:
 	void Reset() override;
 	bool MsgFunc_Health(const char* pszName, int iSize, void* pbuf);
 	bool MsgFunc_Damage(const char* pszName, int iSize, void* pbuf);
+	bool MsgFunc_RelicCarr(const char* pszName, int iSize, void* pbuf);
+	bool MsgFunc_RelicSyn(const char* pszName, int iSize, void* pbuf);
 	int m_iHealth;
 	int m_HUD_dmg_bio;
 	int m_HUD_cross;

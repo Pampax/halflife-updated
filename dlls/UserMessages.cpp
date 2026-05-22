@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "shake.h"
 #include "UserMessages.h"
+#include "relicrush_config.h"
 
 void LinkUserMessages()
 {
@@ -65,4 +66,11 @@ void LinkUserMessages()
 	gmsgStatusValue = REG_USER_MSG("StatusValue", 3);
 
 	gmsgWeapons = REG_USER_MSG("Weapons", 8);
+	gmsgRelicCarrier = REG_USER_MSG("RelicCarr", 1);
+	gmsgRelicSync = REG_USER_MSG("RelicSyn", 3);
+
+	if (gmsgRelicCarrier <= 0 || gmsgRelicSync <= 0)
+		ALERT(at_error, "Relic Rush: echec enregistrement messages RelicCarr/RelicSyn\n");
+
+	RelicRush_RegisterServerCommands();
 }

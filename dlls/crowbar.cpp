@@ -20,6 +20,7 @@
 #include "weapons.h"
 #include "player.h"
 #include "gamerules.h"
+#include "relicrush_carrier.h"
 
 
 #define CROWBAR_BODYHIT_VOLUME 128
@@ -155,6 +156,14 @@ bool CCrowbar::Swing(bool fFirst)
 
 	TraceResult tr;
 
+#ifndef CLIENT_DLL
+	if (fFirst && m_pPlayer && m_pPlayer->m_bHasRelic)
+	{
+		RelicRush_OnCarrierCrowbarUsed(m_pPlayer);
+		RelicRush_QueueCrowbarRush(m_pPlayer);
+	}
+#endif
+
 	UTIL_MakeVectors(m_pPlayer->pev->v_angle);
 	Vector vecSrc = m_pPlayer->GetGunPosition();
 	Vector vecEnd = vecSrc + gpGlobals->v_forward * 32;
@@ -190,7 +199,7 @@ bool CCrowbar::Swing(bool fFirst)
 		if (fFirst)
 		{
 			// miss
-			m_flNextPrimaryAttack = GetNextAttackDelay(0.5);
+			m_flNextPrimaryAttack = GetNextAttackDelay(RelicRush_CrowbarAttackDelay(0.5f, m_pPlayer));
 
 			// player "shoot" animation
 			m_pPlayer->SetAnimation(PLAYER_ATTACK1);
@@ -234,11 +243,22 @@ bool CCrowbar::Swing(bool fFirst)
 			// subsequent swings do half
 			pEntity->TraceAttack(m_pPlayer->pev, gSkillData.plrDmgCrowbar / 2, gpGlobals->v_forward, &tr, DMG_CLUB);
 		}
+		float flVictimHealthBefore = 0.0f;
+		if (pEntity && pEntity->pev)
+			flVictimHealthBefore = pEntity->pev->health;
+
 		ApplyMultiDamage(m_pPlayer->pev, m_pPlayer->pev);
+
+		// Siphon : soins = degats reellement infliges, porteur uniquement
+		if (m_pPlayer && m_pPlayer->m_bHasRelic && pEntity && pEntity->pev)
+		{
+			const float flDealt = V_max(0.0f, flVictimHealthBefore - pEntity->pev->health);
+			RelicRush_ApplySiphonHeal(m_pPlayer, flDealt);
+		}
 
 #endif
 
-		m_flNextPrimaryAttack = GetNextAttackDelay(0.25);
+		m_flNextPrimaryAttack = GetNextAttackDelay(RelicRush_CrowbarAttackDelay(0.25f, m_pPlayer));
 
 #ifndef CLIENT_DLL
 		// play thwack, smack, or dong sound

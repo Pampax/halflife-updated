@@ -29,6 +29,12 @@
 
 DECLARE_MESSAGE(m_Health, Health)
 DECLARE_MESSAGE(m_Health, Damage)
+DECLARE_MESSAGE(m_Health, RelicCarr)
+DECLARE_MESSAGE(m_Health, RelicSyn)
+
+bool g_bRelicCarrierHUD = false;
+bool g_bRelicWallCling = false;
+int g_iRelicCarrierGlowAlpha = 0;
 
 #define PAIN_NAME "sprites/%d_pain.spr"
 #define DAMAGE_NAME "sprites/%d_dmg.spr"
@@ -54,6 +60,8 @@ bool CHudHealth::Init()
 {
 	HOOK_MESSAGE(Health);
 	HOOK_MESSAGE(Damage);
+	HOOK_MESSAGE(RelicCarr);
+	HOOK_MESSAGE(RelicSyn);
 	m_iHealth = 100;
 	m_fFade = 0;
 	m_iFlags = 0;
@@ -71,6 +79,10 @@ bool CHudHealth::Init()
 
 void CHudHealth::Reset()
 {
+	g_bRelicCarrierHUD = false;
+	g_bRelicWallCling = false;
+	g_iRelicCarrierGlowAlpha = 0;
+
 	// make sure the pain compass is cleared when the player respawns
 	m_fAttackFront = m_fAttackRear = m_fAttackRight = m_fAttackLeft = 0;
 
@@ -110,9 +122,49 @@ bool CHudHealth::MsgFunc_Health(const char* pszName, int iSize, void* pbuf)
 		m_iHealth = x;
 	}
 
+	// Porteur Relic Rush (250 PV) : afficher la barre meme sans message RelicCarr
+	if (x >= 200)
+		g_bRelicCarrierHUD = true;
+
 	return true;
 }
 
+bool CHudHealth::MsgFunc_RelicCarr(const char* pszName, int iSize, void* pbuf)
+{
+	BEGIN_READ(pbuf, iSize);
+	g_bRelicCarrierHUD = (READ_BYTE() != 0);
+	if (!g_bRelicCarrierHUD)
+	{
+		g_bRelicWallCling = false;
+		g_iRelicCarrierGlowAlpha = 0;
+	}
+	m_iFlags |= HUD_ACTIVE;
+	return true;
+}
+
+bool CHudHealth::MsgFunc_RelicSyn(const char* pszName, int iSize, void* pbuf)
+{
+	BEGIN_READ(pbuf, iSize);
+	const int flags = READ_BYTE();
+	const int health = READ_SHORT();
+
+	g_bRelicCarrierHUD = (flags & 1) != 0;
+	g_bRelicWallCling = (flags & 2) != 0;
+	g_iRelicCarrierGlowAlpha = g_bRelicCarrierHUD ? (((flags >> 2) & 0x3F) * 4) : 0;
+
+	if (g_bRelicCarrierHUD && health > 0)
+	{
+		m_iHealth = health;
+		m_iFlags |= HUD_ACTIVE;
+	}
+	else if (!g_bRelicCarrierHUD)
+	{
+		g_bRelicWallCling = false;
+		g_iRelicCarrierGlowAlpha = 0;
+	}
+
+	return true;
+}
 
 bool CHudHealth::MsgFunc_Damage(const char* pszName, int iSize, void* pbuf)
 {
@@ -138,20 +190,26 @@ bool CHudHealth::MsgFunc_Damage(const char* pszName, int iSize, void* pbuf)
 
 
 // Returns back a color from the
-// Green <-> Yellow <-> Red ramp
+// Green <-> Yellow <-> Red ramp (porteur relique : vert Xen)
 void CHudHealth::GetPainColor(int& r, int& g, int& b)
 {
-	int iHealth = m_iHealth;
+	if (g_bRelicCarrierHUD)
+	{
+		if (m_iHealth <= 50)
+		{
+			r = 255;
+			g = 96;
+			b = 64;
+		}
+		else
+		{
+			r = 64;
+			g = 255;
+			b = 128;
+		}
+		return;
+	}
 
-	if (iHealth > 25)
-		iHealth -= 25;
-	else if (iHealth < 0)
-		iHealth = 0;
-#if 0
-	g = iHealth * 255 / 100;
-	r = 255 - g;
-	b = 0;
-#else
 	if (m_iHealth > 25)
 	{
 		UnpackRGB(r, g, b, RGB_YELLOWISH);
@@ -162,7 +220,6 @@ void CHudHealth::GetPainColor(int& r, int& g, int& b)
 		g = 0;
 		b = 0;
 	}
-#endif
 }
 
 bool CHudHealth::Draw(float flTime)
@@ -201,8 +258,10 @@ bool CHudHealth::Draw(float flTime)
 	GetPainColor(r, g, b);
 	ScaleColors(r, g, b, a);
 
-	// Only draw health if we have the suit.
-	if (gHUD.HasSuit())
+	const bool bRelicCarrierHealth = g_bRelicCarrierHUD
+		|| (gEngfuncs.GetMaxClients() > 1 && m_iHealth >= 200);
+
+	if (gHUD.HasSuit() || bRelicCarrierHealth)
 	{
 		HealthWidth = gHUD.GetSpriteRect(gHUD.m_HUD_number_0).right - gHUD.GetSpriteRect(gHUD.m_HUD_number_0).left;
 		int CrossWidth = gHUD.GetSpriteRect(m_HUD_cross).right - gHUD.GetSpriteRect(m_HUD_cross).left;
@@ -227,7 +286,16 @@ bool CHudHealth::Draw(float flTime)
 
 		int iHeight = gHUD.m_iFontHeight;
 		int iWidth = HealthWidth / 10;
-		UnpackRGB(r, g, b, RGB_YELLOWISH);
+		if (g_bRelicCarrierHUD)
+		{
+			r = 48;
+			g = 200;
+			b = 96;
+		}
+		else
+		{
+			UnpackRGB(r, g, b, RGB_YELLOWISH);
+		}
 		FillRGBA(x, y, iWidth, iHeight, r, g, b, a);
 	}
 

@@ -165,19 +165,15 @@ if (MSVC)
 endif()
 
 # Set install paths to the user-defined mod directory
-install(TARGETS client
-	RUNTIME DESTINATION cl_dlls
-	LIBRARY DESTINATION cl_dlls
-)
+# Relic Rush : mod serveur uniquement (client Steam vanilla via liblist cldll "0")
+# install(TARGETS client RUNTIME DESTINATION cl_dlls LIBRARY DESTINATION cl_dlls)
 
 install(TARGETS hl
 	RUNTIME DESTINATION dlls
 	LIBRARY DESTINATION dlls
 )
 
-install(FILES 
-	network/delta.lst
-	DESTINATION .)
+# Ne pas installer delta.lst SDK : incompatible client Steam (utiliser celui de valve ou aucun)
 
 if (MSVC)
 	install(FILES $<TARGET_PDB_FILE:client> DESTINATION cl_dlls OPTIONAL)

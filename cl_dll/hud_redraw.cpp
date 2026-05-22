@@ -17,6 +17,7 @@
 //
 #include "hud.h"
 #include "cl_util.h"
+#include "relicrush_overlay.h"
 
 #include "vgui_TeamFortressViewport.h"
 
@@ -179,6 +180,8 @@ bool CHud::Redraw(float flTime, bool intermission)
 
 		SPR_DrawAdditive(i, x, y, NULL);
 	}
+
+	RelicRush_DrawCarrierVisionOverlay(flTime);
 
 	/*
 	if ( g_iVisibleMouse )

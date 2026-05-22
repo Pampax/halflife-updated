@@ -35,6 +35,8 @@
 bool iJumpSpectator;
 float vJumpOrigin[3];
 float vJumpAngles[3];
+extern bool g_bRelicCarrierHUD;
+extern bool g_bRelicWallCling;
 #endif
 
 static bool pm_shared_initialized = false;
@@ -306,6 +308,22 @@ void PM_PlayStepSound(int step, float fvol)
 
 	if (0 != pmove->multiplayer && (!g_onladder && Length(hvel) <= 220))
 		return;
+
+#ifdef CLIENT_DLL
+	if (g_bRelicCarrierHUD)
+	{
+		static const char* s_zombieSteps[] =
+		{
+			"zombie/zombie_step1.wav",
+			"zombie/zombie_step2.wav",
+			"zombie/zombie_step3.wav",
+			"zombie/zombie_step4.wav",
+		};
+		const int idx = irand % ARRAYSIZE(s_zombieSteps);
+		pmove->PM_PlaySound(CHAN_BODY, s_zombieSteps[idx], fvol, ATTN_NORM, 0, 78);
+		return;
+	}
+#endif
 
 	// irand - 0,1 for right foot, 2,3 for left foot
 	// used to alternate left and right foot
@@ -3047,6 +3065,14 @@ void PM_PlayerMove(qboolean server)
 	// Adjust speeds etc.
 	PM_CheckParamters();
 
+#ifdef CLIENT_DLL
+	if (!server && g_bRelicCarrierHUD && g_bRelicWallCling)
+	{
+		pmove->movetype = MOVETYPE_FLY;
+		pmove->gravity = 0;
+	}
+#endif
+
 	// Assume we don't touch anything
 	pmove->numtouch = 0;
 
@@ -3120,9 +3146,19 @@ void PM_PlayerMove(qboolean server)
 		else if (pmove->movetype != MOVETYPE_WALK &&
 				 pmove->movetype != MOVETYPE_NOCLIP)
 		{
-			// Clear ladder stuff unless player is noclipping
-			//  it will be set immediately again next frame if necessary
-			pmove->movetype = MOVETYPE_WALK;
+#ifdef CLIENT_DLL
+			if (g_bRelicCarrierHUD && g_bRelicWallCling)
+			{
+				pmove->movetype = MOVETYPE_FLY;
+				pmove->gravity = 0;
+			}
+			else
+#endif
+			{
+				// Clear ladder stuff unless player is noclipping
+				//  it will be set immediately again next frame if necessary
+				pmove->movetype = MOVETYPE_WALK;
+			}
 		}
 	}
 
@@ -3154,6 +3190,13 @@ void PM_PlayerMove(qboolean server)
 		// Also, set MOVE_TYPE to walk, too.
 		if ((pmove->cmd.buttons & IN_JUMP) != 0)
 		{
+#ifdef CLIENT_DLL
+			if (g_bRelicCarrierHUD && g_bRelicWallCling)
+			{
+				// Relic Rush mur : le saut monte, pas PM_Jump
+			}
+			else
+#endif
 			if (!pLadder)
 			{
 				PM_Jump();

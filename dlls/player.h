@@ -205,6 +205,28 @@ public:
 
 	char m_szTeamName[TEAM_NAME_LENGTH];
 
+	// Black Mesa Relic Rush
+	bool m_bHasRelic = false;
+	bool m_bRelicDebugCam = false;
+	bool m_bRelicHelpShown = false;
+	bool m_bPendingRelicCarrier = false;
+	bool m_bRelicAllowHeal = false;
+	float m_flNextRelicRegen = 0.0f;
+	float m_flNextRelicScream = 0.0f;
+	float m_flNextRelicRush = 0.0f;
+	float m_flRelicVisibleUntil = 0.0f;
+	float m_flBaseMaxHealth = 0.0f;
+	char m_szRelicSavedUserModel[32];
+	int m_iRelicSavedBody = 0;
+	int m_iRelicSavedSkin = 0;
+	bool m_bRelicWallClinging = false;
+	bool m_bRelicLastSyncWallCling = false;
+	bool m_bRelicPendingCrowbarRush = false;
+	Vector m_vecRelicWallNormal;
+	float m_flNextRelicClientSync = 0.0f;
+	float m_flRelicSuppressWallUntil = 0.0f;
+	int m_iRelicLastSyncGlow = -1;
+
 	void Spawn() override;
 	void Pain();
 

@@ -18,6 +18,7 @@
 #include "client.h"
 #include "game.h"
 #include "filesystem_utils.h"
+#include "relicrush_config.h"
 
 cvar_t displaysoundlist = {"displaysoundlist", "0"};
 
@@ -932,6 +933,8 @@ void GameDLLInit()
 	CVAR_REGISTER(&sv_pushable_fixed_tick_fudge);
 
 	InitMapLoadingUtils();
+
+	RelicRush_RegisterBalanceCvars();
 
 	SERVER_COMMAND("exec skill.cfg\n");
 }

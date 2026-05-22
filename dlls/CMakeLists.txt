@@ -73,6 +73,10 @@ target_sources(hl PRIVATE
 	mortar.cpp
 	mp5.cpp
 	multiplay_gamerules.cpp
+	relicrush_gamerules.cpp
+	relicrush_relic.cpp
+	relicrush_carrier.cpp
+	relicrush_config.cpp
 	nihilanth.cpp
 	nodes.cpp
 	observer.cpp
@@ -143,6 +147,9 @@ target_sources(hl PRIVATE
 	flyingmonster.h
 	func_break.h
 	gamerules.h
+	relicrush_gamerules.h
+	relicrush_relic.h
+	relicrush_carrier.h
 	hornet.h
 	items.h
 	monsterevent.h

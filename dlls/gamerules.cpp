@@ -23,6 +23,7 @@
 #include "weapons.h"
 #include "gamerules.h"
 #include "teamplay_gamerules.h"
+#include "relicrush_gamerules.h"
 #include "skill.h"
 #include "game.h"
 #include "UserMessages.h"
@@ -375,8 +376,8 @@ void CGameRules::RefreshSkillData()
 
 CGameRules* InstallGameRules()
 {
-	SERVER_COMMAND("exec game.cfg\n");
-	SERVER_EXECUTE();
+	// Ne pas exec/SERVER_EXECUTE ici : bloque le precache ("precaching resources").
+	// deathmatch etc. : autoexec.cfg, listenserver.cfg, game.cfg (moteur).
 
 	if (1 == sv_busters.value)
 	{
@@ -400,15 +401,14 @@ CGameRules* InstallGameRules()
 		}
 		if ((int)gpGlobals->deathmatch == 1)
 		{
-			// vanilla deathmatch
+			// Black Mesa Relic Rush (deathmatch specialise)
 			g_teamplay = false;
-			return new CHalfLifeMultiplay;
+			return new CRelicRushMultiplay;
 		}
 		else
 		{
-			// vanilla deathmatch??
 			g_teamplay = false;
-			return new CHalfLifeMultiplay;
+			return new CRelicRushMultiplay;
 		}
 	}
 }

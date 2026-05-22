@@ -36,6 +36,7 @@
 #include "shake.h"
 #include "decals.h"
 #include "gamerules.h"
+#include "relicrush_carrier.h"
 #include "game.h"
 #include "pm_shared.h"
 #include "hltv.h"
@@ -283,6 +284,10 @@ void CBasePlayer::DeathSound()
 
 bool CBasePlayer::TakeHealth(float flHealth, int bitsDamageType)
 {
+	// Porteur : soins uniquement via siphon de vie (regen passive geree a part)
+	if (m_bHasRelic && flHealth > 0.0f && !m_bRelicAllowHeal)
+		return false;
+
 	return CBaseMonster::TakeHealth(flHealth, bitsDamageType);
 }
 
@@ -2645,6 +2650,9 @@ void CBasePlayer::PostThink()
 
 	// do weapon stuff
 	ItemPostFrame();
+
+	if (g_pGameRules)
+		g_pGameRules->PlayerPostThink(this);
 
 	// check to see if player landed hard enough to make a sound
 	// falling farther than half of the maximum safe distance, but not as far a max safe distance will

@@ -54,5 +54,7 @@ inline int gmsgStatusText = 0;
 inline int gmsgStatusValue = 0;
 
 inline int gmsgWeapons = 0;
+inline int gmsgRelicCarrier = 0;
+inline int gmsgRelicSync = 0;
 
 void LinkUserMessages();
