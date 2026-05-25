@@ -19,7 +19,6 @@ static const char* g_RelicCarrierScreams[] =
 	"garg/gar_idle2.wav",
 	"houndeye/he_alert1.wav",
 	"houndeye/he_alert2.wav",
-	"houndeye/he_attack1.wav",
 	"tentacle/te_alert1.wav",
 	"tentacle/te_alert2.wav",
 	"tentacle/te_roar1.wav",
@@ -89,26 +88,18 @@ void RelicRush_FinalizeCarrierLoss(CBasePlayer* pPlayer)
 		pPlayer->pev->gravity = 1.0f;
 	}
 
-	if (pPlayer->IsAlive())
+	// Restauration modele : UNIQUEMENT si on avait sauvegarde un modele (transition porteur -> normal).
+	// Ne jamais toucher le modele pour un joueur qui n'a jamais ete porteur (l'engine le gere).
+	if (pPlayer->m_szRelicSavedUserModel[0])
 	{
-		if (pPlayer->m_szRelicSavedUserModel[0])
+		if (pPlayer->IsAlive())
 			RelicRush_RestoreCarrierModel(pPlayer);
 		else
-		{
 			RelicRush_EnsureNormalUserinfoModel(pPlayer);
-			const char* pszModel = g_engfuncs.pfnInfoKeyValue(
-				g_engfuncs.pfnGetInfoKeyBuffer(pPlayer->edict()), "model");
-			if (pszModel && pszModel[0] && stricmp(pszModel, RELIC_CARRIER_USERINFO_MODEL) != 0)
-			{
-				char szModelPath[72];
-				snprintf(szModelPath, sizeof(szModelPath), "models/%s.mdl", pszModel);
-				SET_MODEL(ENT(pPlayer->pev), szModelPath);
-			}
-		}
-		RelicRush_RestorePlayMode(pPlayer);
 	}
-	else
-		RelicRush_EnsureNormalUserinfoModel(pPlayer);
+
+	if (pPlayer->IsAlive())
+		RelicRush_RestorePlayMode(pPlayer);
 
 	RelicRush_SyncCarrierClient(pPlayer);
 }
@@ -319,14 +310,11 @@ void RelicRush_RestoreCarrierModel(CBasePlayer* pPlayer)
 	if (!pPlayer || !pPlayer->IsAlive() || !pPlayer->m_szRelicSavedUserModel[0])
 		return;
 
-	char szModelPath[72];
-	snprintf(szModelPath, sizeof(szModelPath), "models/%s.mdl", pPlayer->m_szRelicSavedUserModel);
-
+	// Restaure UNIQUEMENT l'userinfo : SET_MODEL sur "models/<nom>.mdl" plante car
+	// les modeles joueurs MP vivent en "models/player/<nom>/<nom>.mdl" et ne sont
+	// pas dans la table de precache sous le nom direct (Host_Error: no precache).
+	// L'engine appliquera le bon modele au prochain respawn (ClientPutInServer).
 	RelicRush_SetUserinfoModel(pPlayer, pPlayer->m_szRelicSavedUserModel);
-	SET_MODEL(ENT(pPlayer->pev), szModelPath);
-	pPlayer->pev->body = pPlayer->m_iRelicSavedBody;
-	pPlayer->pev->skin = pPlayer->m_iRelicSavedSkin;
-	pPlayer->pev->sequence = pPlayer->LookupActivity(ACT_IDLE);
 	pPlayer->m_szRelicSavedUserModel[0] = '\0';
 	pPlayer->m_iRelicSavedBody = 0;
 	pPlayer->m_iRelicSavedSkin = 0;
@@ -730,20 +718,14 @@ void RelicRush_TickWallClimb(CBasePlayer* pPlayer)
 	pPlayer->pev->velocity = vel;
 }
 
-static bool g_bRelicModSoundsPrecached = false;
-
 void RelicRush_PrecacheModSounds()
 {
-	if (g_bRelicModSoundsPrecached)
-		return;
-
+	// PRECACHE_SOUND est idempotent ; pas de garde necessaire (le moteur reset entre les maps).
 	PRECACHE_SOUND(RELIC_AMBIENT_SOUND);
 	PRECACHE_SOUND(RELIC_CARRIER_PICKUP_SOUND);
 
 	for (int i = 0; i < ARRAYSIZE(g_RelicCarrierScreams); i++)
 		PRECACHE_SOUND(g_RelicCarrierScreams[i]);
-
-	g_bRelicModSoundsPrecached = true;
 }
 
 void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, float flDamageDealt)

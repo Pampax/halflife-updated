@@ -48,8 +48,14 @@ void CRelicRushRelic::RelicAmbientThink()
 	if (m_bCarried)
 		return;
 
-	UTIL_EmitAmbientSound(ENT(pev), pev->origin, RELIC_AMBIENT_SOUND, 0.65f, ATTN_IDLE, 0, 100);
+	// EMIT_SOUND sur CHAN_STATIC (canal stoppable), pas UTIL_EmitAmbientSound (SND_STOP non fiable)
+	EMIT_SOUND_DYN(ENT(pev), CHAN_STATIC, RELIC_AMBIENT_SOUND, 0.65f, ATTN_IDLE, 0, 100);
 	pev->nextthink = gpGlobals->time + 2.0f;
+}
+
+void CRelicRushRelic::StopAmbient()
+{
+	STOP_SOUND(ENT(pev), CHAN_STATIC, RELIC_AMBIENT_SOUND);
 }
 
 void CRelicRushRelic::HideForPickup()
@@ -57,9 +63,7 @@ void CRelicRushRelic::HideForPickup()
 	m_bCarried = true;
 	SetTouch(nullptr);
 	SetThink(nullptr);
-	STOP_SOUND(ENT(pev), CHAN_STATIC, RELIC_AMBIENT_SOUND);
-	STOP_SOUND(ENT(pev), CHAN_BODY, RELIC_AMBIENT_SOUND);
-	STOP_SOUND(ENT(pev), CHAN_VOICE, RELIC_AMBIENT_SOUND);
+	StopAmbient();
 	pev->solid = SOLID_NOT;
 	pev->effects |= EF_NODRAW;
 	SetThink(&CBaseEntity::SUB_Remove);

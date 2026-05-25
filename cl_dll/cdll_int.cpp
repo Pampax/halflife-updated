@@ -38,6 +38,15 @@
 #include "vgui_TeamFortressViewport.h"
 #include "filesystem_utils.h"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+// HSPRITE est typedef int dans le SDK HL ; Windows.h le redefinit en handle.
+#define HSPRITE WINDOWS_HSPRITE
+#include <windows.h>
+#undef HSPRITE
+#endif
+
 cl_enginefunc_t gEngfuncs;
 CHud gHUD;
 TeamFortressViewport* gViewPort = NULL;
@@ -186,6 +195,9 @@ the hud variables.
 ==========================
 */
 
+// Etat partage musique : detection in-game via fraicheur de HUD_UpdateClientData.
+static double g_flRelicLastClientData = -1.0;
+
 void DLLEXPORT HUD_Init()
 {
 	//	RecClHudInit();
@@ -233,6 +245,9 @@ int DLLEXPORT HUD_UpdateClientData(client_data_t* pcldata, float flTime)
 
 	IN_Commands();
 
+	// Marqueur "in game" : appele uniquement quand le serveur envoie des updates au client.
+	g_flRelicLastClientData = flTime;
+
 	return static_cast<int>(gHUD.UpdateClientData(pcldata, flTime));
 }
 
@@ -259,11 +274,117 @@ Called by engine every frame that client .dll is loaded
 ==========================
 */
 
+#ifdef _WIN32
+static HWND g_hRelicHLWindow = nullptr;
+static HICON g_hRelicIconBig = nullptr;
+static HICON g_hRelicIconSmall = nullptr;
+
+static BOOL CALLBACK RelicRush_FindHLWindow(HWND hwnd, LPARAM /*lparam*/)
+{
+	DWORD pid = 0;
+	GetWindowThreadProcessId(hwnd, &pid);
+	if (pid == GetCurrentProcessId() && GetWindow(hwnd, GW_OWNER) == nullptr && IsWindowVisible(hwnd))
+	{
+		g_hRelicHLWindow = hwnd;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static void RelicRush_ApplyTaskbarIcon()
+{
+	if (g_hRelicHLWindow)
+		return;
+
+	EnumWindows(RelicRush_FindHLWindow, 0);
+	if (!g_hRelicHLWindow)
+		return;
+
+	char szIconPath[MAX_PATH];
+	if (GetCurrentDirectoryA(MAX_PATH, szIconPath) == 0)
+		return;
+	strncat_s(szIconPath, "\\relicrush\\resource\\rr_icon.ico", _TRUNCATE);
+
+	g_hRelicIconSmall = (HICON)LoadImageA(nullptr, szIconPath, IMAGE_ICON,
+		GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_LOADFROMFILE);
+	g_hRelicIconBig = (HICON)LoadImageA(nullptr, szIconPath, IMAGE_ICON,
+		GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_LOADFROMFILE);
+
+	if (g_hRelicIconSmall)
+	{
+		SendMessageA(g_hRelicHLWindow, WM_SETICON, ICON_SMALL, (LPARAM)g_hRelicIconSmall);
+		SetClassLongPtrA(g_hRelicHLWindow, GCLP_HICONSM, (LONG_PTR)g_hRelicIconSmall);
+	}
+	if (g_hRelicIconBig)
+	{
+		SendMessageA(g_hRelicHLWindow, WM_SETICON, ICON_BIG, (LPARAM)g_hRelicIconBig);
+		SetClassLongPtrA(g_hRelicHLWindow, GCLP_HICON, (LONG_PTR)g_hRelicIconBig);
+	}
+}
+#endif
+
 void DLLEXPORT HUD_Frame(double time)
 {
 	//	RecClHudFrame(time);
 
 	GetClientVoiceMgr()->Frame(time);
+
+#ifdef _WIN32
+	static bool s_bRelicIconApplied = false;
+	if (!s_bRelicIconApplied)
+	{
+		s_bRelicIconApplied = true;
+		RelicRush_ApplyTaskbarIcon();
+	}
+#endif
+
+	// Detection "in game" via fraicheur de HUD_UpdateClientData (appele que en jeu).
+	// Fade manuel sur MP3Volume (mp3 fadeout engine ne fait rien sur cette build).
+	static bool s_bRelicWasInGame = false;
+	static bool s_bRelicFading = false;
+	static double s_flRelicFadeStart = 0.0;
+	static float s_flRelicSavedMP3Vol = 1.0f;
+	static const double kFadeDuration = 5.0;
+
+	const bool bInGame = (g_flRelicLastClientData > 0.0 && (time - g_flRelicLastClientData) < 0.5);
+
+	if (s_bRelicWasInGame != bInGame)
+	{
+		if (bInGame)
+		{
+			s_flRelicSavedMP3Vol = gEngfuncs.pfnGetCvarFloat("MP3Volume");
+			if (s_flRelicSavedMP3Vol <= 0.0f)
+				s_flRelicSavedMP3Vol = 1.0f;
+			s_bRelicFading = true;
+			s_flRelicFadeStart = time;
+			gEngfuncs.Con_DPrintf("Relic Rush: connecte -> fade MP3Volume %.2f -> 0\n", s_flRelicSavedMP3Vol);
+		}
+		else
+		{
+			s_bRelicFading = false;
+			gEngfuncs.Cvar_SetValue("MP3Volume", s_flRelicSavedMP3Vol);
+			gEngfuncs.pfnClientCmd("mp3 loop media/relic_rush.mp3\n");
+			gEngfuncs.Con_DPrintf("Relic Rush: deconnecte -> mp3 loop (vol %.2f)\n", s_flRelicSavedMP3Vol);
+		}
+		s_bRelicWasInGame = bInGame;
+	}
+
+	if (s_bRelicFading)
+	{
+		const double t = (time - s_flRelicFadeStart) / kFadeDuration;
+		if (t >= 1.0)
+		{
+			s_bRelicFading = false;
+			gEngfuncs.pfnClientCmd("mp3 stop\n");
+			gEngfuncs.Cvar_SetValue("MP3Volume", s_flRelicSavedMP3Vol);
+			gEngfuncs.Con_DPrintf("Relic Rush: fade fini -> mp3 stop, vol restaure %.2f\n", s_flRelicSavedMP3Vol);
+		}
+		else
+		{
+			const float vol = s_flRelicSavedMP3Vol * (float)(1.0 - t);
+			gEngfuncs.Cvar_SetValue("MP3Volume", vol);
+		}
+	}
 }
 
 

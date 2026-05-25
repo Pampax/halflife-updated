@@ -17,8 +17,19 @@ public:
 	static CRelicRushRelic* CreateAt(const Vector& origin);
 
 	void HideForPickup();
+	void StopAmbient();
 
 private:
 	bool m_bCarried = false;
 	EHANDLE m_hPickupPlayer;
 };
+
+// Helper : stoppe le son ambiant puis libere l'entite (UTIL_Remove ne tue pas le son seul).
+inline void RelicRush_RemoveRelic(CRelicRushRelic*& pRelic)
+{
+	if (!pRelic)
+		return;
+	pRelic->StopAmbient();
+	UTIL_Remove(pRelic);
+	pRelic = nullptr;
+}

@@ -131,11 +131,7 @@ void CRelicRushMultiplay::EndRound()
 	CBasePlayer* pLastCarrier = m_pCarrier;
 	if (m_pCarrier)
 		ClearCarrier(m_pCarrier, false);
-	if (m_pRelic)
-	{
-		UTIL_Remove(m_pRelic);
-		m_pRelic = nullptr;
-	}
+	RelicRush_RemoveRelic(m_pRelic);
 	if (pLastCarrier && pLastCarrier->IsAlive())
 		UTIL_ClientPrintAll(HUD_PRINTCENTER, UTIL_VarArgs("Fin de manche : %s tenait la relique", STRING(pLastCarrier->pev->netname)));
 	else
@@ -145,11 +141,7 @@ void CRelicRushMultiplay::EndRound()
 }
 void CRelicRushMultiplay::SpawnRelic()
 {
-	if (m_pRelic)
-	{
-		UTIL_Remove(m_pRelic);
-		m_pRelic = nullptr;
-	}
+	RelicRush_RemoveRelic(m_pRelic);
 	m_pRelic = CRelicRushRelic::CreateAt(GetRelicSpawnOrigin());
 }
 Vector CRelicRushMultiplay::GetRelicOriginNearPlayer(CBasePlayer* pPlayer) const
@@ -172,11 +164,7 @@ void CRelicRushMultiplay::DebugPlaceRelicNear(CBasePlayer* pPlayer)
 	}
 	if (m_pCarrier)
 		ClearCarrier(m_pCarrier, false);
-	if (m_pRelic)
-	{
-		UTIL_Remove(m_pRelic);
-		m_pRelic = nullptr;
-	}
+	RelicRush_RemoveRelic(m_pRelic);
 	const Vector origin = GetRelicOriginNearPlayer(pPlayer);
 	m_pRelic = CRelicRushRelic::CreateAt(origin);
 	if (!m_bRoundActive)
@@ -378,11 +366,7 @@ void CRelicRushMultiplay::OnRelicPickedUp(CBasePlayer* pPlayer, CRelicRushRelic*
 }
 void CRelicRushMultiplay::OnRelicDropped(const Vector& origin)
 {
-	if (m_pRelic)
-	{
-		UTIL_Remove(m_pRelic);
-		m_pRelic = nullptr;
-	}
+	RelicRush_RemoveRelic(m_pRelic);
 	m_pRelic = CRelicRushRelic::CreateAt(origin);
 	if (!m_pRelic)
 		ALERT(at_warning, "Relic Rush: relique non creee apres drop\n");
@@ -422,7 +406,8 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 		pPlayer->m_bRelicHelpShown = true;
 		ClientPrint(pPlayer->pev, HUD_PRINTNOTIFY,
 			"Relic Rush : console F12/F7/HOME | relique V | vue 3PP F6");
-		g_engfuncs.pfnClientCommand(pPlayer->edict(), "toggleconsole\n");
+		// Fade out + stop de la musique : gere client-side dans HUD_Frame
+		// sur transition GetMaxClients() 0 -> >0 (entree en jeu).
 	}
 	if (RelicRush_IsCarrier(pPlayer))
 	{
