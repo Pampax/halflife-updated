@@ -26,8 +26,9 @@ inline float RelicRush_CrowbarAttackDelay(float flNormalDelay, CBasePlayer* pPla
 
 constexpr const char* RELIC_CARRIER_USERINFO_MODEL = "zombie";
 constexpr const char* RELIC_CARRIER_MONSTER_MODEL = "models/zombie.mdl";
-// Ambiance relique : pulsemachine (vanilla HL, pulsing1 absent sur Steam)
-constexpr const char* RELIC_AMBIENT_SOUND = "ambience/pulsemachine.wav";
+// Ambiance relique : son Xen distinctif (les ambient_generic des maps DM peuvent
+// utiliser pulsemachine/etc., on prend un son electrique-portail clairement identifiable).
+constexpr const char* RELIC_AMBIENT_SOUND = "debris/beamstart8.wav";
 constexpr const char* RELIC_CARRIER_PICKUP_SOUND = "items/suitchargeok1.wav";
 
 inline bool RelicRush_IsCarrierMoving(CBasePlayer* pPlayer)

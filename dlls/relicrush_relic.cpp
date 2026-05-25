@@ -55,7 +55,10 @@ void CRelicRushRelic::RelicAmbientThink()
 
 void CRelicRushRelic::StopAmbient()
 {
+	// Double stop : le son est emis via EMIT_SOUND_DYN (canal) mais certaines builds
+	// GoldSrc routent les sons longs via le pipe ambient -> on couvre les deux APIs.
 	STOP_SOUND(ENT(pev), CHAN_STATIC, RELIC_AMBIENT_SOUND);
+	UTIL_EmitAmbientSound(ENT(pev), pev->origin, RELIC_AMBIENT_SOUND, 0, 0, SND_STOP, 0);
 }
 
 void CRelicRushRelic::HideForPickup()

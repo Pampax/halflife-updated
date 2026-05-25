@@ -195,9 +195,6 @@ the hud variables.
 ==========================
 */
 
-// Etat partage musique : detection in-game via fraicheur de HUD_UpdateClientData.
-static double g_flRelicLastClientData = -1.0;
-
 void DLLEXPORT HUD_Init()
 {
 	//	RecClHudInit();
@@ -244,9 +241,6 @@ int DLLEXPORT HUD_UpdateClientData(client_data_t* pcldata, float flTime)
 	//	RecClHudUpdateClientData(pcldata, flTime);
 
 	IN_Commands();
-
-	// Marqueur "in game" : appele uniquement quand le serveur envoie des updates au client.
-	g_flRelicLastClientData = flTime;
 
 	return static_cast<int>(gHUD.UpdateClientData(pcldata, flTime));
 }
@@ -338,52 +332,24 @@ void DLLEXPORT HUD_Frame(double time)
 	}
 #endif
 
-	// Detection "in game" via fraicheur de HUD_UpdateClientData (appele que en jeu).
-	// Fade manuel sur MP3Volume (mp3 fadeout engine ne fait rien sur cette build).
+	// Detection canonique "in game" via GetMaxClients (0 au menu, > 0 en jeu).
+	// MP3Volume n'agit pas en live sur cette build -> stop net, pas de fade.
 	static bool s_bRelicWasInGame = false;
-	static bool s_bRelicFading = false;
-	static double s_flRelicFadeStart = 0.0;
-	static float s_flRelicSavedMP3Vol = 1.0f;
-	static const double kFadeDuration = 5.0;
-
-	const bool bInGame = (g_flRelicLastClientData > 0.0 && (time - g_flRelicLastClientData) < 0.5);
+	const bool bInGame = (gEngfuncs.GetMaxClients() > 0);
 
 	if (s_bRelicWasInGame != bInGame)
 	{
 		if (bInGame)
 		{
-			s_flRelicSavedMP3Vol = gEngfuncs.pfnGetCvarFloat("MP3Volume");
-			if (s_flRelicSavedMP3Vol <= 0.0f)
-				s_flRelicSavedMP3Vol = 1.0f;
-			s_bRelicFading = true;
-			s_flRelicFadeStart = time;
-			gEngfuncs.Con_DPrintf("Relic Rush: connecte -> fade MP3Volume %.2f -> 0\n", s_flRelicSavedMP3Vol);
+			gEngfuncs.pfnClientCmd("mp3 stop\n");
+			gEngfuncs.Con_DPrintf("Relic Rush: connecte (maxClients>0) -> mp3 stop\n");
 		}
 		else
 		{
-			s_bRelicFading = false;
-			gEngfuncs.Cvar_SetValue("MP3Volume", s_flRelicSavedMP3Vol);
 			gEngfuncs.pfnClientCmd("mp3 loop media/relic_rush.mp3\n");
-			gEngfuncs.Con_DPrintf("Relic Rush: deconnecte -> mp3 loop (vol %.2f)\n", s_flRelicSavedMP3Vol);
+			gEngfuncs.Con_DPrintf("Relic Rush: menu (maxClients=0) -> mp3 loop\n");
 		}
 		s_bRelicWasInGame = bInGame;
-	}
-
-	if (s_bRelicFading)
-	{
-		const double t = (time - s_flRelicFadeStart) / kFadeDuration;
-		if (t >= 1.0)
-		{
-			s_bRelicFading = false;
-			gEngfuncs.pfnClientCmd("mp3 stop\n");
-			gEngfuncs.Cvar_SetValue("MP3Volume", s_flRelicSavedMP3Vol);
-			gEngfuncs.Con_DPrintf("Relic Rush: fade fini -> mp3 stop, vol restaure %.2f\n", s_flRelicSavedMP3Vol);
-		}
-		else
-		{
-			const float vol = s_flRelicSavedMP3Vol * (float)(1.0 - t);
-			gEngfuncs.Cvar_SetValue("MP3Volume", vol);
-		}
 	}
 }
 
