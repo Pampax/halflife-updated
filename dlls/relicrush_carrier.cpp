@@ -9,6 +9,7 @@
 #include "cdll_dll.h"
 #include "UserMessages.h"
 
+// Sons vanilla HL verifies (pas bullchicken/controller : absents sur certaines installs)
 static const char* g_RelicCarrierScreams[] =
 {
 	"garg/gar_alert1.wav",
@@ -16,23 +17,108 @@ static const char* g_RelicCarrierScreams[] =
 	"garg/gar_alert3.wav",
 	"garg/gar_idle1.wav",
 	"garg/gar_idle2.wav",
-	"bullchicken/bc_attackgrowl.wav",
-	"bullchicken/bc_attackgrowl2.wav",
-	"bullchicken/bc_attackgrowl3.wav",
-	"controller/con_alert1.wav",
-	"controller/con_alert2.wav",
-	"controller/con_alert3.wav",
-	"controller/con_pain1.wav",
 	"houndeye/he_alert1.wav",
 	"houndeye/he_alert2.wav",
+	"houndeye/he_attack1.wav",
 	"tentacle/te_alert1.wav",
 	"tentacle/te_alert2.wav",
+	"tentacle/te_roar1.wav",
+	"agrunt/ag_alert1.wav",
+	"agrunt/ag_alert2.wav",
+	"agrunt/ag_alert3.wav",
+	"weapons/ric1.wav",
+	"weapons/ric2.wav",
+	"weapons/ric3.wav",
 };
+
+static void RelicRush_SetUserinfoModel(CBasePlayer* pPlayer, const char* pszModel);
+
+void RelicRush_ResetCarrierVisuals(CBasePlayer* pPlayer)
+{
+	if (!pPlayer)
+		return;
+
+	pPlayer->pev->rendermode = kRenderNormal;
+	pPlayer->pev->renderfx = kRenderFxNone;
+	pPlayer->pev->renderamt = 0;
+	pPlayer->pev->rendercolor = g_vecZero;
+}
+
+static void RelicRush_EnsureNormalUserinfoModel(CBasePlayer* pPlayer)
+{
+	if (!pPlayer)
+		return;
+
+	const char* pszModel = g_engfuncs.pfnInfoKeyValue(
+		g_engfuncs.pfnGetInfoKeyBuffer(pPlayer->edict()), "model");
+
+	if (pPlayer->m_szRelicSavedUserModel[0])
+	{
+		RelicRush_SetUserinfoModel(pPlayer, pPlayer->m_szRelicSavedUserModel);
+		pPlayer->m_szRelicSavedUserModel[0] = '\0';
+		pPlayer->m_iRelicSavedBody = 0;
+		pPlayer->m_iRelicSavedSkin = 0;
+		return;
+	}
+
+	if (pszModel && stricmp(pszModel, RELIC_CARRIER_USERINFO_MODEL) == 0)
+		RelicRush_SetUserinfoModel(pPlayer, "gina");
+}
+
+void RelicRush_FinalizeCarrierLoss(CBasePlayer* pPlayer)
+{
+	if (!pPlayer)
+		return;
+
+	RelicRush_ResetCarrierVisuals(pPlayer);
+
+	pPlayer->m_bPendingRelicCarrier = false;
+	pPlayer->m_bRelicAllowHeal = false;
+	pPlayer->m_flRelicVisibleUntil = 0.0f;
+	pPlayer->m_flNextRelicClientSync = 0.0f;
+	pPlayer->m_bRelicLastSyncWallCling = false;
+	pPlayer->m_bRelicPendingCrowbarRush = false;
+	pPlayer->m_flRelicSuppressWallUntil = 0.0f;
+	pPlayer->m_iRelicLastSyncGlow = -1;
+	pPlayer->m_bRelicWallClinging = false;
+	pPlayer->m_vecRelicWallNormal = g_vecZero;
+
+	if (pPlayer->pev->movetype == MOVETYPE_FLY)
+	{
+		pPlayer->pev->movetype = MOVETYPE_WALK;
+		pPlayer->pev->gravity = 1.0f;
+	}
+
+	if (pPlayer->IsAlive())
+	{
+		if (pPlayer->m_szRelicSavedUserModel[0])
+			RelicRush_RestoreCarrierModel(pPlayer);
+		else
+		{
+			RelicRush_EnsureNormalUserinfoModel(pPlayer);
+			const char* pszModel = g_engfuncs.pfnInfoKeyValue(
+				g_engfuncs.pfnGetInfoKeyBuffer(pPlayer->edict()), "model");
+			if (pszModel && pszModel[0] && stricmp(pszModel, RELIC_CARRIER_USERINFO_MODEL) != 0)
+			{
+				char szModelPath[72];
+				snprintf(szModelPath, sizeof(szModelPath), "models/%s.mdl", pszModel);
+				SET_MODEL(ENT(pPlayer->pev), szModelPath);
+			}
+		}
+		RelicRush_RestorePlayMode(pPlayer);
+	}
+	else
+		RelicRush_EnsureNormalUserinfoModel(pPlayer);
+
+	RelicRush_SyncCarrierClient(pPlayer);
+}
 
 void RelicRush_RestorePlayMode(CBasePlayer* pPlayer)
 {
 	if (!pPlayer || !pPlayer->IsAlive())
 		return;
+
+	RelicRush_ResetCarrierVisuals(pPlayer);
 
 	pPlayer->pev->iuser1 = 0;
 	pPlayer->pev->iuser2 = 0;
@@ -230,7 +316,7 @@ void RelicRush_ReapplyCarrierModel(CBasePlayer* pPlayer)
 
 void RelicRush_RestoreCarrierModel(CBasePlayer* pPlayer)
 {
-	if (!pPlayer || !pPlayer->m_szRelicSavedUserModel[0])
+	if (!pPlayer || !pPlayer->IsAlive() || !pPlayer->m_szRelicSavedUserModel[0])
 		return;
 
 	char szModelPath[72];
@@ -436,7 +522,7 @@ void RelicRush_RefreshCarrierHUD(CBasePlayer* pPlayer, float flHealth)
 		pPlayer->m_ClientWeaponBits = pPlayer->m_WeaponBits;
 	}
 
-	EMIT_SOUND_SUIT(pPlayer->edict(), "!HEV_A0");
+	EMIT_SOUND_DYN(pPlayer->edict(), CHAN_ITEM, RELIC_CARRIER_PICKUP_SOUND, 0.6f, ATTN_NORM, 0, PITCH_NORM);
 	pPlayer->UpdateClientData();
 }
 
@@ -644,16 +730,20 @@ void RelicRush_TickWallClimb(CBasePlayer* pPlayer)
 	pPlayer->pev->velocity = vel;
 }
 
-static bool g_bRelicCarrierSoundsPrecached = false;
+static bool g_bRelicModSoundsPrecached = false;
 
-void RelicRush_PrecacheCarrierSounds()
+void RelicRush_PrecacheModSounds()
 {
-	if (g_bRelicCarrierSoundsPrecached)
+	if (g_bRelicModSoundsPrecached)
 		return;
+
+	PRECACHE_SOUND(RELIC_AMBIENT_SOUND);
+	PRECACHE_SOUND(RELIC_CARRIER_PICKUP_SOUND);
 
 	for (int i = 0; i < ARRAYSIZE(g_RelicCarrierScreams); i++)
 		PRECACHE_SOUND(g_RelicCarrierScreams[i]);
-	g_bRelicCarrierSoundsPrecached = true;
+
+	g_bRelicModSoundsPrecached = true;
 }
 
 void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, float flDamageDealt)

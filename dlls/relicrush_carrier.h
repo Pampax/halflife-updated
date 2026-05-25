@@ -26,7 +26,9 @@ inline float RelicRush_CrowbarAttackDelay(float flNormalDelay, CBasePlayer* pPla
 
 constexpr const char* RELIC_CARRIER_USERINFO_MODEL = "zombie";
 constexpr const char* RELIC_CARRIER_MONSTER_MODEL = "models/zombie.mdl";
-constexpr const char* RELIC_AMBIENT_SOUND = "ambience/pulsing1.wav";
+// Ambiance relique : pulsemachine (vanilla HL, pulsing1 absent sur Steam)
+constexpr const char* RELIC_AMBIENT_SOUND = "ambience/pulsemachine.wav";
+constexpr const char* RELIC_CARRIER_PICKUP_SOUND = "items/suitchargeok1.wav";
 
 inline bool RelicRush_IsCarrierMoving(CBasePlayer* pPlayer)
 {
@@ -38,6 +40,8 @@ inline bool RelicRush_IsCarrierMoving(CBasePlayer* pPlayer)
 	return (vx * vx + vy * vy) >= (thresh * thresh);
 }
 
+void RelicRush_ResetCarrierVisuals(CBasePlayer* pPlayer);
+void RelicRush_FinalizeCarrierLoss(CBasePlayer* pPlayer);
 void RelicRush_RestorePlayMode(CBasePlayer* pPlayer);
 void RelicRush_ApplyCarrierModel(CBasePlayer* pPlayer);
 void RelicRush_ReapplyCarrierModel(CBasePlayer* pPlayer);
@@ -54,7 +58,7 @@ void RelicRush_ApplyPendingCrowbarRush(CBasePlayer* pPlayer);
 void RelicRush_CrowbarRush(CBasePlayer* pPlayer);
 void RelicRush_TickWallClimb(CBasePlayer* pPlayer);
 
-void RelicRush_PrecacheCarrierSounds();
+void RelicRush_PrecacheModSounds();
 void RelicRush_ScheduleNextCarrierScream(CBasePlayer* pCarrier);
 void RelicRush_TickCarrierScreams(CBasePlayer* pCarrier);
 void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, float flDamageDealt);

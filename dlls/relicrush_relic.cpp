@@ -13,7 +13,7 @@ LINK_ENTITY_TO_CLASS(item_relic, CRelicRushRelic);
 
 void CRelicRushRelic::Precache()
 {
-	PRECACHE_SOUND(RELIC_AMBIENT_SOUND);
+	RelicRush_PrecacheModSounds();
 }
 
 void CRelicRushRelic::Spawn()
@@ -102,5 +102,10 @@ void CRelicRushRelic::RelicTouch(CBaseEntity* pOther)
 CRelicRushRelic* CRelicRushRelic::CreateAt(const Vector& origin)
 {
 	CBaseEntity* pEntity = CBaseEntity::Create("item_relic", origin, g_vecZero);
-	return pEntity ? static_cast<CRelicRushRelic*>(pEntity) : nullptr;
+	if (!pEntity)
+	{
+		ALERT(at_warning, "Relic Rush: echec spawn relique a %g %g %g\n", origin.x, origin.y, origin.z);
+		return nullptr;
+	}
+	return static_cast<CRelicRushRelic*>(pEntity);
 }

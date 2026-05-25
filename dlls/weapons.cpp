@@ -29,6 +29,7 @@
 #include "soundent.h"
 #include "decals.h"
 #include "gamerules.h"
+#include "relicrush_carrier.h"
 #include "UserMessages.h"
 
 #define NOT_USED 255
@@ -1166,6 +1167,11 @@ void CWeaponBox::Touch(CBaseEntity* pOther)
 	}
 
 	CBasePlayer* pPlayer = (CBasePlayer*)pOther;
+
+	// Porteur relique : pas de loot (armes au sol, weaponbox des autres joueurs, etc.)
+	if (RelicRush_IsCarrier(pPlayer))
+		return;
+
 	int i;
 
 	// dole out ammo

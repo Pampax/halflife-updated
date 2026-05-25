@@ -3766,6 +3766,9 @@ void CBasePlayer::CheatImpulseCommands(int iImpulse)
 //
 bool CBasePlayer::AddPlayerItem(CBasePlayerItem* pItem)
 {
+	if (RelicRush_IsCarrier(this))
+		return false;
+
 	CBasePlayerItem* pInsert;
 
 	pInsert = m_rgpPlayerItems[pItem->iItemSlot()];

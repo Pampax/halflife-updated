@@ -22,6 +22,7 @@ public:
 	int IPointsForKill(CBasePlayer* pAttacker, CBasePlayer* pKilled) override;
 	bool CanHavePlayerItem(CBasePlayer* pPlayer, CBasePlayerItem* pItem) override;
 	bool CanHaveItem(CBasePlayer* pPlayer, CItem* pItem) override;
+	bool CanHaveAmmo(CBasePlayer* pPlayer, const char* pszAmmoName, int iMaxCarry) override;
 	bool PlayFootstepSounds(CBasePlayer* pl, float fvol) override;
 	bool ClientCommand(CBasePlayer* pPlayer, const char* pcmd) override;
 	void ClientUserInfoChanged(CBasePlayer* pPlayer, char* infobuffer) override;

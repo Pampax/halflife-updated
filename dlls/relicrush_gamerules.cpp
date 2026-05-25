@@ -44,9 +44,7 @@ CRelicRushMultiplay::CRelicRushMultiplay()
 	// Precache pendant InstallGameRules (phase precache map), pas en jeu.
 	PRECACHE_MODEL("models/w_antidote.mdl");
 	PRECACHE_MODEL(RELIC_CARRIER_MONSTER_MODEL);
-	PRECACHE_SOUND(RELIC_AMBIENT_SOUND);
-	PRECACHE_SOUND("items/suitchargeok1.wav");
-	RelicRush_PrecacheCarrierSounds();
+	RelicRush_PrecacheModSounds();
 }
 
 void CRelicRushMultiplay::ClientUserInfoChanged(CBasePlayer* pPlayer, char* infobuffer)
@@ -298,7 +296,7 @@ void CRelicRushMultiplay::SetCarrier(CBasePlayer* pPlayer)
 	pPlayer->m_bRelicLastSyncWallCling = false;
 
 	ClientPrint(pPlayer->pev, HUD_PRINTCENTER, "Vous portez la relique !");
-	EMIT_SOUND_DYN(pPlayer->edict(), CHAN_ITEM, "items/suitchargeok1.wav", 1.0f, ATTN_NORM, 0, PITCH_NORM);
+	EMIT_SOUND_DYN(pPlayer->edict(), CHAN_ITEM, RELIC_CARRIER_PICKUP_SOUND, 1.0f, ATTN_NORM, 0, PITCH_NORM);
 }
 
 void CRelicRushMultiplay::CompleteRelicPickup(CBasePlayer* pPlayer)
@@ -314,15 +312,8 @@ void CRelicRushMultiplay::ClearCarrier(CBasePlayer* pPlayer, bool bAnnounce)
 		return;
 	ApplyCarrierEffects(pPlayer, false);
 	pPlayer->m_bHasRelic = false;
-	RelicRush_RestorePlayMode(pPlayer);
+	RelicRush_FinalizeCarrierLoss(pPlayer);
 	pPlayer->UpdateClientData();
-	pPlayer->m_bPendingRelicCarrier = false;
-	pPlayer->m_bRelicAllowHeal = false;
-	pPlayer->m_flRelicVisibleUntil = 0.0f;
-	pPlayer->m_flNextRelicClientSync = 0.0f;
-	pPlayer->m_bRelicLastSyncWallCling = false;
-	pPlayer->m_bRelicPendingCrowbarRush = false;
-	pPlayer->m_flRelicSuppressWallUntil = 0.0f;
 	if (m_pCarrier == pPlayer)
 		m_pCarrier = nullptr;
 	if (bAnnounce)
@@ -357,12 +348,19 @@ void CRelicRushMultiplay::ApplyCarrierEffects(CBasePlayer* pPlayer, bool enable)
 			pPlayer->pev->max_health = pPlayer->m_flBaseMaxHealth;
 		pPlayer->m_fLongJump = false;
 		g_engfuncs.pfnSetPhysicsKeyValue(pPlayer->edict(), "slj", "0");
-		pPlayer->pev->renderfx = kRenderFxNone;
-		pPlayer->pev->renderamt = 0;
-		pPlayer->pev->rendercolor = g_vecZero;
-		RelicRush_RestoreCarrierModel(pPlayer);
-		RelicRush_RestorePlayMode(pPlayer);
-		RelicRush_SyncCarrierClient(pPlayer);
+		RelicRush_ResetCarrierVisuals(pPlayer);
+		pPlayer->m_bRelicWallClinging = false;
+		pPlayer->m_vecRelicWallNormal = g_vecZero;
+		if (pPlayer->pev->movetype == MOVETYPE_FLY)
+		{
+			pPlayer->pev->movetype = MOVETYPE_WALK;
+			pPlayer->pev->gravity = 1.0f;
+		}
+		if (pPlayer->IsAlive())
+		{
+			RelicRush_RestoreCarrierModel(pPlayer);
+			RelicRush_RestorePlayMode(pPlayer);
+		}
 	}
 }
 void CRelicRushMultiplay::OnRelicPickedUp(CBasePlayer* pPlayer, CRelicRushRelic* pRelic)
@@ -386,15 +384,23 @@ void CRelicRushMultiplay::OnRelicDropped(const Vector& origin)
 		m_pRelic = nullptr;
 	}
 	m_pRelic = CRelicRushRelic::CreateAt(origin);
+	if (!m_pRelic)
+		ALERT(at_warning, "Relic Rush: relique non creee apres drop\n");
 }
 void CRelicRushMultiplay::PlayerKilled(CBasePlayer* pVictim, entvars_t* pKiller, entvars_t* pInflictor)
 {
 	const bool bWasCarrier = pVictim && pVictim->m_bHasRelic;
-	const Vector dropOrigin = pVictim ? pVictim->pev->origin : g_vecZero;
+	const Vector dropOrigin = pVictim ? pVictim->pev->origin + Vector(0, 0, 8) : g_vecZero;
+
+	// Retirer la relique tant que le joueur est encore vivant (evite SET_MODEL sur cadavre = crash).
+	if (bWasCarrier)
+		ClearCarrier(pVictim, false);
+
 	CHalfLifeMultiplay::PlayerKilled(pVictim, pKiller, pInflictor);
+
 	if (!bWasCarrier)
 		return;
-	ClearCarrier(pVictim, false);
+
 	OnRelicDropped(dropOrigin);
 	UTIL_ClientPrintAll(HUD_PRINTCENTER, "La relique est tombee !");
 }
@@ -405,7 +411,11 @@ int CRelicRushMultiplay::IPointsForKill(CBasePlayer* pAttacker, CBasePlayer* pKi
 void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 {
 	CHalfLifeMultiplay::PlayerSpawn(pPlayer);
-	RelicRush_RestorePlayMode(pPlayer);
+
+	if (!RelicRush_IsCarrier(pPlayer))
+		RelicRush_FinalizeCarrierLoss(pPlayer);
+	else
+		RelicRush_RestorePlayMode(pPlayer);
 
 	if (!pPlayer->m_bRelicHelpShown)
 	{
@@ -492,11 +502,19 @@ bool CRelicRushMultiplay::CanHavePlayerItem(CBasePlayer* pPlayer, CBasePlayerIte
 		return false;
 	return CHalfLifeMultiplay::CanHavePlayerItem(pPlayer, pItem);
 }
+
 bool CRelicRushMultiplay::CanHaveItem(CBasePlayer* pPlayer, CItem* pItem)
 {
 	if (RelicRush_IsCarrier(pPlayer))
 		return false;
 	return CHalfLifeMultiplay::CanHaveItem(pPlayer, pItem);
+}
+
+bool CRelicRushMultiplay::CanHaveAmmo(CBasePlayer* pPlayer, const char* pszAmmoName, int iMaxCarry)
+{
+	if (RelicRush_IsCarrier(pPlayer))
+		return false;
+	return CGameRules::CanHaveAmmo(pPlayer, pszAmmoName, iMaxCarry);
 }
 bool CRelicRushMultiplay::PlayFootstepSounds(CBasePlayer* pl, float fvol)
 {
