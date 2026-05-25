@@ -333,7 +333,6 @@ void DLLEXPORT HUD_Frame(double time)
 #endif
 
 	// Detection canonique "in game" via GetMaxClients (0 au menu, > 0 en jeu).
-	// MP3Volume n'agit pas en live sur cette build -> stop net, pas de fade.
 	static bool s_bRelicWasInGame = false;
 	const bool bInGame = (gEngfuncs.GetMaxClients() > 0);
 
