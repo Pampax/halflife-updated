@@ -42,6 +42,7 @@ void CCrowbar::Spawn()
 void CCrowbar::Precache()
 {
 	PRECACHE_MODEL("models/v_crowbar.mdl");
+	PRECACHE_MODEL("models/v_knife.mdl");
 	PRECACHE_MODEL("models/w_crowbar.mdl");
 	PRECACHE_MODEL("models/p_crowbar.mdl");
 	PRECACHE_SOUND("weapons/cbar_hit1.wav");
@@ -74,8 +75,7 @@ bool CCrowbar::GetItemInfo(ItemInfo* p)
 bool CCrowbar::Deploy()
 {
 #ifndef CLIENT_DLL
-	// Porteur de relique : v_knife.mdl (OpFor, inclus dans relicrush/models/).
-	// Memes indices d'animation que la crowbar (attack1/2/3 = slash melee).
+	// Porteur de relique : v_knife.mdl — uniquement sequence attack3 (slash griffes).
 	// Pas de p_*.mdl en 3PP : les autres voient le zombie griffer (PLAYER_ATTACK1).
 	if (m_pPlayer && m_pPlayer->m_bHasRelic)
 	{
@@ -224,17 +224,22 @@ bool CCrowbar::Swing(bool fFirst)
 	}
 	else
 	{
-		switch (((m_iSwing++) % 2) + 1)
+		if (m_pPlayer && m_pPlayer->m_bHasRelic)
+			SendWeaponAnim(RELIC_CARRIER_CLAW_ATTACK_SEQ);
+		else
 		{
-		case 0:
-			SendWeaponAnim(CROWBAR_ATTACK1HIT);
-			break;
-		case 1:
-			SendWeaponAnim(CROWBAR_ATTACK2HIT);
-			break;
-		case 2:
-			SendWeaponAnim(CROWBAR_ATTACK3HIT);
-			break;
+			switch (((m_iSwing++) % 2) + 1)
+			{
+			case 0:
+				SendWeaponAnim(CROWBAR_ATTACK1HIT);
+				break;
+			case 1:
+				SendWeaponAnim(CROWBAR_ATTACK2HIT);
+				break;
+			case 2:
+				SendWeaponAnim(CROWBAR_ATTACK3HIT);
+				break;
+			}
 		}
 
 		// player "shoot" animation

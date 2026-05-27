@@ -23,6 +23,14 @@
 #include "const.h"
 #include "entity_state.h"
 #include "r_efx.h"
+#include "cl_entity.h"
+
+extern bool g_bRelicCarrierHUD;
+
+// v_knife.mdl : sequence attack3 = index 7 (CROWBAR_ATTACK3MISS dans weapons.h serveur).
+static const int kRelicClawAttackSeq = 7;
+static const int kRelicClawIdleSeq = 0;
+static const float kRelicClawAnimFramerate = 2.0f;
 
 // g_runfuncs is true if this is the first time we've "predicated" a particular movement/firing
 //  command.  If it is 1, then we should play events/sounds etc., otherwise, we just will be
@@ -92,6 +100,18 @@ void HUD_SendWeaponAnim(int iAnim, int body, bool force)
 
 	// Tell animation system new info
 	gEngfuncs.pfnWeaponAnim(iAnim, body);
+
+	if (g_bRelicCarrierHUD)
+	{
+		cl_entity_t* vm = gEngfuncs.GetViewModel();
+		if (vm)
+		{
+			if (iAnim == kRelicClawAttackSeq)
+				vm->curstate.framerate = kRelicClawAnimFramerate;
+			else if (iAnim == kRelicClawIdleSeq)
+				vm->curstate.framerate = 1.0f;
+		}
+	}
 }
 
 /*

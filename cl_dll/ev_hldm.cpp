@@ -41,8 +41,11 @@
 
 #include "r_studioint.h"
 #include "com_model.h"
-
 extern engine_studio_api_t IEngineStudio;
+extern bool g_bRelicCarrierHUD;
+extern cl_entity_t* GetViewEntity();
+
+static const float kRelicClawAnimFramerate = 2.0f;
 
 static int tracerCount[MAX_PLAYERS];
 
@@ -1119,17 +1122,27 @@ void EV_Crowbar(event_args_t* args)
 
 	if (EV_IsLocal(idx))
 	{
-		switch ((g_iSwing++) % 3)
+		if (g_bRelicCarrierHUD)
 		{
-		case 0:
-			gEngfuncs.pEventAPI->EV_WeaponAnimation(CROWBAR_ATTACK1MISS, 0);
-			break;
-		case 1:
-			gEngfuncs.pEventAPI->EV_WeaponAnimation(CROWBAR_ATTACK2MISS, 0);
-			break;
-		case 2:
 			gEngfuncs.pEventAPI->EV_WeaponAnimation(CROWBAR_ATTACK3MISS, 0);
-			break;
+			cl_entity_t* vm = GetViewEntity();
+			if (vm)
+				vm->curstate.framerate = kRelicClawAnimFramerate;
+		}
+		else
+		{
+			switch ((g_iSwing++) % 3)
+			{
+			case 0:
+				gEngfuncs.pEventAPI->EV_WeaponAnimation(CROWBAR_ATTACK1MISS, 0);
+				break;
+			case 1:
+				gEngfuncs.pEventAPI->EV_WeaponAnimation(CROWBAR_ATTACK2MISS, 0);
+				break;
+			case 2:
+				gEngfuncs.pEventAPI->EV_WeaponAnimation(CROWBAR_ATTACK3MISS, 0);
+				break;
+			}
 		}
 	}
 }

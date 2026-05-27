@@ -37,6 +37,9 @@ constexpr int RELIC_CARRIER_BOTTOMCOLOR = 0;
 // utiliser pulsemachine/etc., on prend un son electrique-portail clairement identifiable).
 constexpr const char* RELIC_AMBIENT_SOUND = "debris/beamstart8.wav";
 constexpr const char* RELIC_CARRIER_PICKUP_SOUND = "items/suitchargeok1.wav";
+// v_knife.mdl : sequence "attack3" = CROWBAR_ATTACK3MISS (slash griffes porteur).
+constexpr int RELIC_CARRIER_CLAW_ATTACK_SEQ = 7; // CROWBAR_ATTACK3MISS
+constexpr float RELIC_CARRIER_CLAW_ANIM_FRAMERATE = 2.0f;
 
 inline bool RelicRush_IsCarrierMoving(CBasePlayer* pPlayer)
 {

@@ -197,7 +197,7 @@ the hud variables.
 
 // Workaround Create Server : la UI plante sur "Random Map" / divers cas non identifies.
 // Cette commande client offre un point d'entree fiable depuis la console du menu :
-//   rr_start [map]   -> coupe la musique + lance la map en deathmatch maxplayers=3
+//   rr_start [map]   -> lance la map en deathmatch maxplayers=3
 static void RelicRush_StartCmd()
 {
 	const char* pszMap = "crossfire";
@@ -206,7 +206,6 @@ static void RelicRush_StartCmd()
 
 	char szCmd[256];
 	_snprintf(szCmd, sizeof(szCmd),
-		"mp3 stop\n"
 		"maxplayers 3\n"
 		"deathmatch 1\n"
 		"map %s\n",
@@ -361,34 +360,6 @@ void DLLEXPORT HUD_Frame(double time)
 	}
 #endif
 
-	// Detection canonique "in game" via GetMaxClients (0 au menu, > 0 en jeu).
-	// IMPORTANT : le handler mp3 du moteur crashe dans ucrtbase.dll si on re-envoie
-	// "mp3 loop" apres certaines transitions (ex: retour d'une map SP). On limite donc
-	// les re-emissions a un nombre fini pour eviter le crash a la N-ieme reprise.
-	static bool s_bRelicWasInGame = false;
-	static int s_iRelicMp3LoopsFired = 1; // userconfig.cfg en a deja fait 1 au boot
-	static const int kRelicMp3LoopsMax = 2; // total : 1 boot + 1 reprise = 2 max
-	const bool bInGame = (gEngfuncs.GetMaxClients() > 0);
-
-	if (s_bRelicWasInGame != bInGame)
-	{
-		if (bInGame)
-		{
-			gEngfuncs.pfnClientCmd("mp3 stop\n");
-			gEngfuncs.Con_DPrintf("Relic Rush: connecte (maxClients>0) -> mp3 stop\n");
-		}
-		else if (s_iRelicMp3LoopsFired < kRelicMp3LoopsMax)
-		{
-			s_iRelicMp3LoopsFired++;
-			gEngfuncs.pfnClientCmd("mp3 loop media/relic_rush.mp3\n");
-			gEngfuncs.Con_DPrintf("Relic Rush: menu (loop #%d) -> mp3 loop\n", s_iRelicMp3LoopsFired);
-		}
-		else
-		{
-			gEngfuncs.Con_DPrintf("Relic Rush: menu (loops epuises, evite crash mp3 handler)\n");
-		}
-		s_bRelicWasInGame = bInGame;
-	}
 }
 
 
