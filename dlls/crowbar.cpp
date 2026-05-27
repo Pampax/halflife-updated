@@ -73,6 +73,20 @@ bool CCrowbar::GetItemInfo(ItemInfo* p)
 
 bool CCrowbar::Deploy()
 {
+#ifndef CLIENT_DLL
+	// Porteur de relique : on garde la mecanique crowbar (degats, sons, swing) mais
+	// le viewmodel est remplace par la hivehand alien (organique, plus proche d'une
+	// griffe biologique que la crowbar). Le p_*.mdl est mis a "" pour cacher l'arme
+	// en vue 3eme personne (sinon les autres joueurs voient une crowbar attachee au
+	// modele zombie du porteur).
+	if (m_pPlayer && m_pPlayer->m_bHasRelic)
+	{
+		const bool bOk = DefaultDeploy("models/v_hgun.mdl", "", CROWBAR_DRAW, "crowbar");
+		// Force le weaponmodel a vide meme si DefaultDeploy a set une valeur (defensif).
+		m_pPlayer->pev->weaponmodel = iStringNull;
+		return bOk;
+	}
+#endif
 	return DefaultDeploy("models/v_crowbar.mdl", "models/p_crowbar.mdl", CROWBAR_DRAW, "crowbar");
 }
 

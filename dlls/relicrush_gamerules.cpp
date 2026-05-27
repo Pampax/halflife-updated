@@ -46,6 +46,9 @@ CRelicRushMultiplay::CRelicRushMultiplay()
 	// Precache pendant InstallGameRules (phase precache map), pas en jeu.
 	PRECACHE_MODEL("models/w_antidote.mdl");
 	PRECACHE_MODEL(RELIC_CARRIER_MONSTER_MODEL);
+	// Viewmodel "griffes" du porteur : hivehand alien (organique violet/orange,
+	// le plus proche d'une extension biologique en vanilla HL). Voir CCrowbar::Deploy().
+	PRECACHE_MODEL("models/v_hgun.mdl");
 	RelicRush_PrecacheModSounds();
 	RelicRush_PrecacheGooAssets();
 }
@@ -286,6 +289,15 @@ void CRelicRushMultiplay::SetCarrier(CBasePlayer* pPlayer)
 	pPlayer->m_flNextRelicClientSync = 0.0f;
 	pPlayer->m_bRelicLastSyncWallCling = false;
 
+	// Swap viewmodel "griffes" + retrait weaponmodel : ApplyCarrierLoadout a deja
+	// appele Deploy() AVANT que m_bHasRelic soit true, donc la crowbar a pose les
+	// modeles normaux. On force les bons maintenant que le flag est pose.
+	if (pPlayer->m_pActiveItem && pPlayer->m_pActiveItem->m_iId == WEAPON_CROWBAR)
+	{
+		pPlayer->pev->viewmodel = MAKE_STRING("models/v_hgun.mdl");
+		pPlayer->pev->weaponmodel = iStringNull;
+	}
+
 	ClientPrint(pPlayer->pev, HUD_PRINTCENTER, "Vous portez la relique !");
 	EMIT_SOUND_DYN(pPlayer->edict(), CHAN_ITEM, RELIC_CARRIER_PICKUP_SOUND, 1.0f, ATTN_NORM, 0, PITCH_NORM);
 }
@@ -432,6 +444,13 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 		ApplyCarrierLoadout(pPlayer);
 		pPlayer->m_bHasRelic = true;
 		ApplyCarrierEffects(pPlayer, true);
+		// Re-swap le viewmodel + cache weaponmodel : ApplyCarrierLoadout a recharge
+		// les modeles normaux.
+		if (pPlayer->m_pActiveItem && pPlayer->m_pActiveItem->m_iId == WEAPON_CROWBAR)
+		{
+			pPlayer->pev->viewmodel = MAKE_STRING("models/v_hgun.mdl");
+			pPlayer->pev->weaponmodel = iStringNull;
+		}
 	}
 }
 void CRelicRushMultiplay::PlayerThink(CBasePlayer* pPlayer)
