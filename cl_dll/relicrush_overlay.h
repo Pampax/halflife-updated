@@ -5,3 +5,5 @@
 
 void RelicRush_DrawCarrierVisionOverlay(float flTime);
 void RelicRush_DrawGooCooldownBar(float flTime);
+void RelicRush_DrawCarrierCrosshair(float flTime);
+void RelicRush_ApplyCarrierCrosshair(bool bOnTarget);

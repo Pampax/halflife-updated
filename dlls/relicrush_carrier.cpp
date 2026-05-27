@@ -684,16 +684,20 @@ void RelicRush_CrowbarRush(CBasePlayer* pPlayer)
 		return;
 	aim = aim * (1.0f / flLen);
 
+	// Vitesse fixe dans la direction visee (pas de reduction selon la distance du trace).
+	const Vector velRush = aim * g_RelicBalance.rushSpeed;
+
+	// Evite de lancer le dash dans un mur a bout de bras.
 	TraceResult tr;
 	const Vector vecStart = pPlayer->pev->origin + Vector(0, 0, 8);
 	const Vector vecEnd = vecStart + aim * g_RelicBalance.rushTraceDist;
 	UTIL_TraceHull(vecStart, vecEnd, dont_ignore_monsters, head_hull, pPlayer->edict(), &tr);
-
-	float flScale = 1.0f;
 	if (tr.flFraction < 1.0f)
-		flScale = V_max(0.25f, tr.flFraction - 0.05f);
-
-	const Vector velRush = aim * (g_RelicBalance.rushSpeed * flScale);
+	{
+		const float flHitDist = tr.flFraction * g_RelicBalance.rushTraceDist;
+		if (flHitDist < 24.0f)
+			return;
+	}
 
 	if (bFromWall)
 	{
@@ -704,7 +708,7 @@ void RelicRush_CrowbarRush(CBasePlayer* pPlayer)
 	}
 	else
 	{
-		pPlayer->pev->velocity = pPlayer->pev->velocity + velRush;
+		pPlayer->pev->velocity = velRush;
 	}
 
 	pPlayer->m_flNextRelicRush = gpGlobals->time + g_RelicBalance.rushCooldown;

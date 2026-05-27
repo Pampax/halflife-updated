@@ -3,7 +3,7 @@
  *
  * Pattern projectile inspire de CRpgRocket (rpg.cpp) + CGrenade::Explode (ggrenade.cpp),
  * mais sans homing, sans degats, et avec effets verts (decals "spit", screen fade vert,
- * son d'impact liquide (pl_slosh / pl_wade), decals repandus en zone).
+ * vapeur verte + sons liquide (pl_slosh / pl_wade), decals repandus en zone).
  ***/
 #include "extdll.h"
 #include "util.h"
@@ -19,8 +19,11 @@
 
 LINK_ENTITY_TO_CLASS(relic_goo, CRelicGooProjectile);
 
-// Couleur verte commune (decal/fade/glow)
-static const Vector kRelicGooColor(32, 220, 72);
+// Vert pur (pas de composante bleue : evite teinte cyan sur beam / fade)
+static const Vector kRelicGooColor(0, 255, 0);
+
+// Fumee xen verte (sprites additifs : TE_SPRITE, pas TE_SMOKE = carre noir).
+static int g_iRelicGooSmokeSprite[4] = { 0, 0, 0, 0 };
 
 static int RelicRush_PickGooDecal()
 {
@@ -39,6 +42,8 @@ static void RelicRush_TryGooDecalTrace(const Vector& vecStart, const Vector& vec
 // Eclaboussures vertes reparties dans une sphere autour de l'impact (sol, murs, plafond).
 static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCenterHit, edict_t* pSkip)
 {
+	const float flRadius = RELIC_GOO_SPLASH_DECAL_RADIUS;
+
 	if (pCenterHit && pCenterHit->flFraction < 1.0f)
 	{
 		UTIL_DecalTrace(pCenterHit, RelicRush_PickGooDecal());
@@ -60,18 +65,17 @@ static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCen
 			up = CrossProduct(right, wallN).Normalize();
 		}
 
-		for (int c = 0; c < RANDOM_LONG(2, 4); c++)
+		for (int c = 0; c < RANDOM_LONG(5, 8); c++)
 		{
 			const Vector vecOff = pCenterHit->vecEndPos
-				+ right * RANDOM_FLOAT(-36.0f, 36.0f)
-				+ up * RANDOM_FLOAT(-36.0f, 36.0f)
+				+ right * RANDOM_FLOAT(-flRadius * 0.85f, flRadius * 0.85f)
+				+ up * RANDOM_FLOAT(-flRadius * 0.85f, flRadius * 0.85f)
 				+ wallN * 4.0f;
-			RelicRush_TryGooDecalTrace(vecOff, vecOff - wallN * 24.0f, pSkip);
+			RelicRush_TryGooDecalTrace(vecOff, vecOff - wallN * 32.0f, pSkip);
 		}
 	}
 
 	const int nSplats = RANDOM_LONG(RELIC_GOO_SPLASH_DECAL_MIN, RELIC_GOO_SPLASH_DECAL_MAX);
-	const float flRadius = RELIC_GOO_SPLASH_DECAL_RADIUS;
 
 	for (int i = 0; i < nSplats; i++)
 	{
@@ -83,25 +87,78 @@ static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCen
 		const float flLen = dir.Length();
 		if (flLen < 0.01f)
 			continue;
-		dir = dir * (RANDOM_FLOAT(flRadius * 0.25f, flRadius) / flLen);
+		dir = dir * (RANDOM_FLOAT(flRadius * 0.15f, flRadius) / flLen);
 
 		const Vector vecProbe = vecOrigin + dir;
-		RelicRush_TryGooDecalTrace(vecProbe, vecProbe - dir * 1.15f, pSkip);
+		RelicRush_TryGooDecalTrace(vecProbe, vecProbe - dir * 28.0f, pSkip);
+	}
+
+	// Anneaux supplementaires (sol + murs)
+	for (int ring = 0; ring < 2; ring++)
+	{
+		const float flRing = flRadius * (0.4f + ring * 0.35f);
+		const int nRingPts = 8 + ring * 2;
+		for (int r = 0; r < nRingPts; r++)
+		{
+			const float ang = (6.2831853f * r) / nRingPts;
+			const Vector vecProbe = vecOrigin + Vector(cosf(ang) * flRing, sinf(ang) * flRing, RANDOM_FLOAT(-12.0f, 18.0f));
+			RelicRush_TryGooDecalTrace(vecProbe, vecProbe - Vector(0, 0, 48.0f), pSkip);
+			RelicRush_TryGooDecalTrace(vecProbe, vecProbe + Vector(cosf(ang), sinf(ang), 0) * 32.0f, pSkip);
+		}
 	}
 
 	// Renfort vers le sol sous l'impact (flaque au sol)
-	for (int f = 0; f < 3; f++)
+	for (int f = 0; f < 7; f++)
 	{
 		const Vector vecFloorStart = vecOrigin + Vector(
-			RANDOM_FLOAT(-flRadius * 0.6f, flRadius * 0.6f),
-			RANDOM_FLOAT(-flRadius * 0.6f, flRadius * 0.6f),
-			8.0f);
-		RelicRush_TryGooDecalTrace(vecFloorStart, vecFloorStart - Vector(0, 0, 72.0f), pSkip);
+			RANDOM_FLOAT(-flRadius * 0.95f, flRadius * 0.95f),
+			RANDOM_FLOAT(-flRadius * 0.95f, flRadius * 0.95f),
+			12.0f);
+		RelicRush_TryGooDecalTrace(vecFloorStart, vecFloorStart - Vector(0, 0, 96.0f), pSkip);
 	}
 }
 
-static void RelicRush_PlayGooImpactSounds(const Vector& vecOrigin, edict_t* pEnt)
+static int RelicRush_PickGooSmokeSprite()
 {
+	int pool[4];
+	int n = 0;
+	for (int j = 0; j < 4; j++)
+	{
+		if (g_iRelicGooSmokeSprite[j] > 0)
+			pool[n++] = g_iRelicGooSmokeSprite[j];
+	}
+	if (n > 0)
+		return pool[RANDOM_LONG(0, n - 1)];
+	return 0;
+}
+
+// Nuage vert xen : TE_SPRITE (additif). TE_SMOKE + xsmoke = carre noir (alphablend requis).
+static void RelicRush_PlayGooExplosionFX(const Vector& vecOrigin, edict_t* pOwner)
+{
+	for (int i = 0; i < 5; i++)
+	{
+		const int iSprite = RelicRush_PickGooSmokeSprite();
+		if (iSprite <= 0)
+			continue;
+
+		const Vector vecPuff = vecOrigin + Vector(
+			RANDOM_FLOAT(-20.0f, 20.0f),
+			RANDOM_FLOAT(-20.0f, 20.0f),
+			RANDOM_FLOAT(6.0f, 28.0f));
+
+		MESSAGE_BEGIN(MSG_PVS, SVC_TEMPENTITY, vecPuff);
+		WRITE_BYTE(TE_SPRITE);
+		WRITE_COORD(vecPuff.x);
+		WRITE_COORD(vecPuff.y);
+		WRITE_COORD(vecPuff.z);
+		WRITE_SHORT(iSprite);
+		WRITE_BYTE(RANDOM_LONG(16, 26));  // echelle (*0.1)
+		WRITE_BYTE(RANDOM_LONG(150, 210)); // luminosite
+		MESSAGE_END();
+	}
+
+	CSoundEnt::InsertSound(bits_SOUND_PLAYER, vecOrigin, 384, 2.5f);
+
 	static const char* kSlosh[] =
 	{
 		RELIC_GOO_IMPACT_SOUND_1,
@@ -109,32 +166,15 @@ static void RelicRush_PlayGooImpactSounds(const Vector& vecOrigin, edict_t* pEnt
 		RELIC_GOO_IMPACT_SOUND_3,
 		RELIC_GOO_IMPACT_SOUND_4,
 	};
-	const char* pszMain = kSlosh[RANDOM_LONG(0, ARRAYSIZE(kSlosh) - 1)];
+	const char* pszSlosh = kSlosh[RANDOM_LONG(0, ARRAYSIZE(kSlosh) - 1)];
 
-	// Impact principal : eclaboussure / flaque (pl_slosh)
-	EMIT_SOUND_DYN(pEnt, CHAN_VOICE, pszMain, 1.0f, ATTN_NORM, 0, RANDOM_LONG(92, 108));
-	// Couche grave + etouffee (pl_wade) pour le "splash" de masse
-	EMIT_SOUND_DYN(pEnt, CHAN_BODY, RELIC_GOO_IMPACT_SOUND_DEEP, 0.75f, ATTN_NORM, 0, RANDOM_LONG(78, 92));
-	// Petite goutte / fin d'impact
-	EMIT_SOUND_DYN(pEnt, CHAN_STATIC, kSlosh[RANDOM_LONG(0, ARRAYSIZE(kSlosh) - 1)],
-		0.45f, ATTN_NORM, 0, RANDOM_LONG(105, 120));
-}
-
-void CRelicGooProjectile::Precache()
-{
-	PRECACHE_MODEL("models/grenade.mdl");
-	PRECACHE_SOUND(RELIC_GOO_FIRE_SOUND);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_1);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_2);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_3);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_4);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_DEEP);
+	edict_t* pEmit = (!FNullEnt(pOwner)) ? pOwner : INDEXENT(0);
+	UTIL_EmitAmbientSound(pEmit, vecOrigin, pszSlosh, 1.0f, ATTN_NORM, 0, RANDOM_LONG(95, 108));
+	UTIL_EmitAmbientSound(pEmit, vecOrigin, RELIC_GOO_IMPACT_SOUND_DEEP, 0.85f, ATTN_NORM, 0, RANDOM_LONG(88, 102));
 }
 
 void CRelicGooProjectile::Spawn()
 {
-	Precache();
-
 	pev->movetype = MOVETYPE_FLY;
 	pev->solid = SOLID_BBOX;
 	pev->gravity = 0.0f;
@@ -144,20 +184,41 @@ void CRelicGooProjectile::Spawn()
 	UTIL_SetSize(pev, Vector(-2, -2, -2), Vector(2, 2, 2));
 	UTIL_SetOrigin(pev, pev->origin);
 
-	// Boule verte glow
+	// Projectile vert lumineux (glow fort, mesh discret)
 	pev->rendermode = kRenderTransAdd;
 	pev->renderfx = kRenderFxGlowShell;
 	pev->rendercolor = kRelicGooColor;
-	pev->renderamt = 255;
-	pev->effects |= EF_LIGHT;
-	pev->scale = 1.4f;
+	pev->renderamt = 220;
+	pev->effects |= EF_BRIGHTLIGHT;
+	pev->scale = 0.45f;
+
+	StartGreenTrail();
 
 	SetTouch(&CRelicGooProjectile::GooTouch);
 	SetThink(&CRelicGooProjectile::GooFlyThink);
-	pev->nextthink = gpGlobals->time + 0.1f;
+	pev->nextthink = gpGlobals->time + 0.05f;
 
 	// Auto-detruit apres 4s si rien touche
 	pev->dmgtime = gpGlobals->time + 4.0f;
+}
+
+void CRelicGooProjectile::StartGreenTrail()
+{
+	// g_sModelIndexLaser : precache map (weapons.cpp), jamais PRECACHE_MODEL en jeu.
+	if (g_sModelIndexLaser <= 0)
+		return;
+
+	MESSAGE_BEGIN(MSG_BROADCAST, SVC_TEMPENTITY);
+	WRITE_BYTE(TE_BEAMFOLLOW);
+	WRITE_SHORT(entindex());
+	WRITE_SHORT(g_sModelIndexLaser);
+	WRITE_BYTE(RELIC_GOO_TRAIL_LIFE);	// duree (*0.1s, ex. 40 = 4 s)
+	WRITE_BYTE(4);						// largeur
+	WRITE_BYTE((int)kRelicGooColor.x);	// r, g, b
+	WRITE_BYTE((int)kRelicGooColor.y);
+	WRITE_BYTE((int)kRelicGooColor.z);
+	WRITE_BYTE(140);					// luminosite (trainee semi-transparente)
+	MESSAGE_END();
 }
 
 void CRelicGooProjectile::GooFlyThink()
@@ -170,7 +231,7 @@ void CRelicGooProjectile::GooFlyThink()
 		Explode(&tr);
 		return;
 	}
-	pev->nextthink = gpGlobals->time + 0.1f;
+	pev->nextthink = gpGlobals->time + 0.05f;
 }
 
 void CRelicGooProjectile::Explode(TraceResult* pTrace)
@@ -184,27 +245,26 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 	if (pTrace && pTrace->flFraction != 1.0f)
 		pev->origin = pTrace->vecEndPos + (pTrace->vecPlaneNormal * 2.0f);
 
-	// Splash visuel : lumiere dynamique verte (TE_DLIGHT) + sprite explosion energy.
+	RelicRush_PlayGooExplosionFX(pev->origin, pev->owner);
+
+	// Lumiere verte courte
 	MESSAGE_BEGIN(MSG_PAS, SVC_TEMPENTITY, pev->origin);
 	WRITE_BYTE(TE_DLIGHT);
 	WRITE_COORD(pev->origin.x);
 	WRITE_COORD(pev->origin.y);
 	WRITE_COORD(pev->origin.z);
-	WRITE_BYTE(20);				   // radius (*10)
+	WRITE_BYTE(24);
 	WRITE_BYTE((int)kRelicGooColor.x);
 	WRITE_BYTE((int)kRelicGooColor.y);
 	WRITE_BYTE((int)kRelicGooColor.z);
-	WRITE_BYTE(8);				   // life (*10 -> 0.8s)
-	WRITE_BYTE(80);				   // decay
+	WRITE_BYTE(6);
+	WRITE_BYTE(90);
 	MESSAGE_END();
 
-	// Bulles / gouttelettes (effet liquide, meme hors de l'eau — le moteur affiche quand meme).
 	UTIL_Bubbles(
 		pev->origin - Vector(48, 48, 24),
 		pev->origin + Vector(48, 48, 48),
-		RANDOM_LONG(12, 20));
-
-	RelicRush_PlayGooImpactSounds(pev->origin, ENT(pev));
+		RANDOM_LONG(8, 14));
 	RelicRush_SplashGooDecals(pev->origin, pTrace, ENT(pev));
 
 	// Aveuglement AoE : tous les joueurs dans le rayon (proprietaire epargne).
@@ -238,7 +298,16 @@ void CRelicGooProjectile::GooTouch(CBaseEntity* pOther)
 	}
 
 	TraceResult tr;
-	const Vector vecDir = pev->velocity.Normalize();
+	Vector vecDir = pev->velocity;
+	if (vecDir.Length() < 1.0f)
+	{
+		UTIL_MakeVectors(pev->angles);
+		vecDir = gpGlobals->v_forward;
+	}
+	else
+	{
+		vecDir = vecDir.Normalize();
+	}
 	const Vector vecStart = pev->origin - vecDir * 8.0f;
 	UTIL_TraceLine(vecStart, vecStart + vecDir * 32.0f, ignore_monsters, ENT(pev), &tr);
 
@@ -274,6 +343,10 @@ CRelicGooProjectile* CRelicGooProjectile::Shoot(CBasePlayer* pOwner, Vector vecO
 void RelicRush_PrecacheGooAssets()
 {
 	PRECACHE_MODEL("models/grenade.mdl");
+	g_iRelicGooSmokeSprite[0] = PRECACHE_MODEL("sprites/xsmoke1.spr");
+	g_iRelicGooSmokeSprite[1] = PRECACHE_MODEL("sprites/xsmoke3.spr");
+	g_iRelicGooSmokeSprite[2] = PRECACHE_MODEL("sprites/xsmoke4.spr");
+	g_iRelicGooSmokeSprite[3] = PRECACHE_MODEL("sprites/xssmke1.spr");
 	PRECACHE_SOUND(RELIC_GOO_FIRE_SOUND);
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_1);
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_2);

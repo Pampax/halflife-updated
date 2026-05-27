@@ -50,9 +50,9 @@ void RelicRush_DrawCarrierVisionOverlay(float flTime)
 		return;
 
 	const int border = V_max(12, XRES(36));
-	const int r = 24;
-	const int g = 220;
-	const int b = 72;
+	const int r = 0;
+	const int g = 255;
+	const int b = 0;
 
 	// Synchronise avec le glow du skin (visible / fondu / invisible)
 	const float glowScale = g_iRelicCarrierGlowAlpha / 255.0f;
@@ -104,7 +104,7 @@ void RelicRush_DrawGooCooldownBar(float flTime)
 	const int barY = h - V_max(40, YRES(56));
 
 	// Fond noir semi-transparent + liseré vert sombre.
-	FillRGBA(barX - 2, barY - 2, barW + 4, barH + 4, 8, 32, 16, 180);
+	FillRGBA(barX - 2, barY - 2, barW + 4, barH + 4, 0, 48, 0, 180);
 	FillRGBA(barX, barY, barW, barH, 0, 0, 0, 200);
 
 	const int pct = (g_iRelicGooCooldownPct < 0) ? 0 : ((g_iRelicGooCooldownPct > 100) ? 100 : g_iRelicGooCooldownPct);
@@ -116,16 +116,16 @@ void RelicRush_DrawGooCooldownBar(float flTime)
 	{
 		// Pulsation legere quand pret.
 		const float pulse = 0.85f + 0.15f * (0.5f + 0.5f * sinf(flTime * 6.0f));
-		rC = (int)(48 * pulse);
+		rC = 0;
 		gC = (int)(255 * pulse);
-		bC = (int)(96 * pulse);
+		bC = 0;
 		aC = 235;
 	}
 	else
 	{
-		rC = 32;
+		rC = 0;
 		gC = 200;
-		bC = 72;
+		bC = 0;
 		aC = 220;
 	}
 
@@ -135,5 +135,52 @@ void RelicRush_DrawGooCooldownBar(float flTime)
 	// Marque centrale (subdivision visuelle, type "tick"). Optionnel mais lisible.
 	const int tickH = barH / 2;
 	const int tickY = barY + (barH - tickH) / 2;
-	FillRGBA(barX + barW / 2 - 1, tickY, 2, tickH, 8, 64, 24, 120);
+	FillRGBA(barX + barW / 2 - 1, tickY, 2, tickH, 0, 96, 0, 120);
+}
+
+static bool s_bCarrierCrossOnTarget = false;
+
+// Croix verte en X (diagonale) au centre de l'ecran.
+void RelicRush_DrawCarrierCrosshair(float flTime)
+{
+	(void)flTime;
+	if (!g_bRelicCarrierHUD)
+		return;
+	if (0 != gEngfuncs.IsSpectateOnly())
+		return;
+	if ((gHUD.m_iHideHUDDisplay & (HIDEHUD_WEAPONS | HIDEHUD_ALL)) != 0)
+		return;
+
+	const int w = ScreenWidth;
+	const int h = ScreenHeight;
+	if (w < 64 || h < 48)
+		return;
+
+	const int cx = w / 2;
+	const int cy = h / 2;
+	const int arm = V_max(6, XRES(10));
+	const int thick = V_max(1, YRES(1));
+	const int alpha = 50; // opacite
+
+	for (int d = -arm; d <= arm; d++)
+	{
+		FillRGBA(cx + d - thick / 2, cy + d - thick / 2, thick, thick, 0, 255, 0, alpha);
+		FillRGBA(cx + d - thick / 2, cy - d - thick / 2, thick, thick, 0, 255, 0, alpha);
+	}
+}
+
+// Masque le reticule d'arme ; le X vert est dessine dans hud_redraw.
+void RelicRush_ApplyCarrierCrosshair(bool bOnTarget)
+{
+	s_bCarrierCrossOnTarget = bOnTarget;
+
+	if (!g_bRelicCarrierHUD)
+		return;
+	if (0 != gEngfuncs.IsSpectateOnly())
+		return;
+	if ((gHUD.m_iHideHUDDisplay & (HIDEHUD_WEAPONS | HIDEHUD_ALL)) != 0)
+		return;
+
+	static Rect nullrc;
+	SetCrosshair(0, nullrc, 0, 0, 0);
 }

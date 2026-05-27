@@ -28,6 +28,9 @@
 
 #include "ammohistory.h"
 #include "vgui_TeamFortressViewport.h"
+#include "relicrush_overlay.h"
+
+extern bool g_bRelicCarrierHUD;
 
 WEAPON* gpActiveSel; // NULL means off, 1 means just the menu bar, otherwise
 					 // this points to the active weapon menu item
@@ -549,7 +552,9 @@ bool CHudAmmo::MsgFunc_HideWeapon(const char* pszName, int iSize, void* pbuf)
 	}
 	else
 	{
-		if (m_pWeapon)
+		if (g_bRelicCarrierHUD)
+			RelicRush_ApplyCarrierCrosshair(false);
+		else if (m_pWeapon)
 			SetCrosshair(m_pWeapon->hCrosshair, m_pWeapon->rcCrosshair, 255, 255, 255);
 	}
 
@@ -613,7 +618,11 @@ bool CHudAmmo::MsgFunc_CurWeapon(const char* pszName, int iSize, void* pbuf)
 
 	m_pWeapon = pWeapon;
 
-	if (gHUD.m_iFOV >= 90)
+	if (g_bRelicCarrierHUD)
+	{
+		RelicRush_ApplyCarrierCrosshair(fOnTarget);
+	}
+	else if (gHUD.m_iFOV >= 90)
 	{ // normal crosshairs
 		if (fOnTarget && 0 != m_pWeapon->hAutoaim)
 			SetCrosshair(m_pWeapon->hAutoaim, m_pWeapon->rcAutoaim, 255, 255, 255);
