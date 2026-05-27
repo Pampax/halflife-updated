@@ -74,15 +74,14 @@ bool CCrowbar::GetItemInfo(ItemInfo* p)
 bool CCrowbar::Deploy()
 {
 #ifndef CLIENT_DLL
-	// Porteur de relique : on garde la mecanique crowbar (degats, sons, swing) mais
-	// le viewmodel est remplace par la hivehand alien (organique, plus proche d'une
-	// griffe biologique que la crowbar). Le p_*.mdl est mis a "" pour cacher l'arme
-	// en vue 3eme personne (sinon les autres joueurs voient une crowbar attachee au
-	// modele zombie du porteur).
+	// Porteur de relique : aucun viewmodel (mains "invisibles" en 1ere personne, comme
+	// dans la plupart des FPS ou on ne voit pas son corps). Le punch d'angle dans Swing()
+	// simule le swing de griffe. En 3eme personne les autres voient l'animation
+	// d'attaque du modele zombie (SetAnimation(PLAYER_ATTACK1)).
 	if (m_pPlayer && m_pPlayer->m_bHasRelic)
 	{
-		const bool bOk = DefaultDeploy("models/v_hgun.mdl", "", CROWBAR_DRAW, "crowbar");
-		// Force le weaponmodel a vide meme si DefaultDeploy a set une valeur (defensif).
+		const bool bOk = DefaultDeploy("models/v_crowbar.mdl", "", CROWBAR_DRAW, "crowbar");
+		m_pPlayer->pev->viewmodel = iStringNull;
 		m_pPlayer->pev->weaponmodel = iStringNull;
 		return bOk;
 	}
@@ -175,6 +174,12 @@ bool CCrowbar::Swing(bool fFirst)
 	{
 		RelicRush_OnCarrierCrowbarUsed(m_pPlayer);
 		RelicRush_QueueCrowbarRush(m_pPlayer);
+		// Punch d'angle : simule le swing de griffe (vue invisible des mains).
+		// Alterne haut/bas + droite/gauche pour varier les coups.
+		const float flSide = ((m_iSwing & 1) ? 1.0f : -1.0f) * 3.5f;
+		m_pPlayer->pev->punchangle.x = -7.0f;
+		m_pPlayer->pev->punchangle.y = flSide;
+		m_pPlayer->pev->punchangle.z = flSide * 0.5f;
 	}
 #endif
 
