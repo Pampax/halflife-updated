@@ -74,4 +74,4 @@ void RelicRush_TickWallClimb(CBasePlayer* pPlayer);
 void RelicRush_PrecacheModSounds();
 void RelicRush_ScheduleNextCarrierScream(CBasePlayer* pCarrier);
 void RelicRush_TickCarrierScreams(CBasePlayer* pCarrier);
-void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, float flDamageDealt);
+void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, CBasePlayer* pVictim, float flDamageDealt);

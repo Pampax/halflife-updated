@@ -12,7 +12,7 @@ RelicRushBalance g_RelicBalance = {
 	300.0f, 6.0f,
 	3.0f, 3.0f, 10.0f, 1.0f,
 	140.0f, 3.0f, 1.0f, 0.15f, 255.0f, 0.0f, 255.0f, 0.0f,
-	0.45f, 18.0f,
+	0.45f, 18.0f, 50.0f,
 };
 
 static cvar_t rr_maxhealth = {"rr_maxhealth", "250", FCVAR_SERVER};
@@ -46,6 +46,7 @@ static cvar_t rr_goo_blind_g = {"rr_goo_blind_g", "255", FCVAR_SERVER};
 static cvar_t rr_goo_blind_b = {"rr_goo_blind_b", "0", FCVAR_SERVER};
 static cvar_t rr_goo_blind_blob_scale = {"rr_goo_blind_blob_scale", "0.45", FCVAR_SERVER};
 static cvar_t rr_goo_blind_blob_count = {"rr_goo_blind_blob_count", "18", FCVAR_SERVER};
+static cvar_t rr_goo_victim_glow_amt = {"rr_goo_victim_glow_amt", "50", FCVAR_SERVER};
 
 static float RR_ClampCvar(const char* name, float value, float minVal, float maxVal)
 {
@@ -104,6 +105,7 @@ void RelicRush_RefreshBalance()
 	g_RelicBalance.gooBlindB = RR_ClampCvar("rr_goo_blind_b", CVAR_GET_FLOAT("rr_goo_blind_b"), 0.0f, 255.0f);
 	g_RelicBalance.gooBlindBlobScale = RR_ClampCvar("rr_goo_blind_blob_scale", CVAR_GET_FLOAT("rr_goo_blind_blob_scale"), 0.15f, 1.5f);
 	g_RelicBalance.gooBlindBlobCount = RR_ClampCvar("rr_goo_blind_blob_count", CVAR_GET_FLOAT("rr_goo_blind_blob_count"), 1.0f, 24.0f);
+	g_RelicBalance.gooVictimGlowAmt = RR_ClampCvar("rr_goo_victim_glow_amt", CVAR_GET_FLOAT("rr_goo_victim_glow_amt"), 1.0f, 255.0f);
 }
 
 void RelicRush_RegisterBalanceCvars()
@@ -139,6 +141,7 @@ void RelicRush_RegisterBalanceCvars()
 	CVAR_REGISTER(&rr_goo_blind_b);
 	CVAR_REGISTER(&rr_goo_blind_blob_scale);
 	CVAR_REGISTER(&rr_goo_blind_blob_count);
+	CVAR_REGISTER(&rr_goo_victim_glow_amt);
 
 	SERVER_COMMAND("exec relicrush_balance.cfg\n");
 	RelicRush_RefreshBalance();

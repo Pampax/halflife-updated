@@ -234,6 +234,7 @@ public:
 	int m_iRelicGooCooldownPct = -1;
 	float m_flRelicGooBlindUntil = 0.0f;
 	int m_iRelicGooBlindFaded = 0;
+	bool m_bRelicGooVictimGlow = false;
 
 	void Spawn() override;
 	void Pain();

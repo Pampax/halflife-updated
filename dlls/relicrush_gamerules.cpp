@@ -423,12 +423,16 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 
 	// Reset voile vert si la victime respawn pendant l'effet (sinon le ScreenFade
 	// reste pose cote client jusqu'au prochain fade naturel).
-	if (pPlayer && pPlayer->m_flRelicGooBlindUntil > 0.0f)
+	if (pPlayer && (pPlayer->m_flRelicGooBlindUntil > 0.0f || pPlayer->m_bRelicGooVictimGlow))
 	{
-		pPlayer->m_flRelicGooBlindUntil = 0.0f;
-		pPlayer->m_iRelicGooBlindFaded = 0;
 		if (pPlayer->IsNetClient())
 			RelicRush_ClearGooBlindClient(pPlayer);
+		else
+		{
+			pPlayer->m_flRelicGooBlindUntil = 0.0f;
+			pPlayer->m_iRelicGooBlindFaded = 0;
+			RelicRush_ClearGooVictimGlow(pPlayer);
+		}
 	}
 
 	if (!RelicRush_IsCarrier(pPlayer))
@@ -440,7 +444,7 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 	{
 		pPlayer->m_bRelicHelpShown = true;
 		ClientPrint(pPlayer->pev, HUD_PRINTNOTIFY,
-			"Relic Rush : console F12/F7/HOME | relique V | vue 3PP F6");
+			"Relic Rush : relique Xen sur la map - regles dans le MOTD a la connexion.");
 		// Fade out + stop de la musique : gere client-side dans HUD_Frame
 		// sur transition GetMaxClients() 0 -> >0 (entree en jeu).
 	}
@@ -465,7 +469,7 @@ void CRelicRushMultiplay::PlayerThink(CBasePlayer* pPlayer)
 		CompleteRelicPickup(pPlayer);
 
 	// Fadeout du voile vert (victimes touchees par la goo) : a calculer pour TOUS les joueurs.
-	RelicRush_TickPlayerBlindFade(pPlayer);
+	RelicRush_TickGooVictimEffects(pPlayer);
 
 	if (!RelicRush_IsCarrier(pPlayer) || !pPlayer->IsAlive())
 		return;

@@ -63,7 +63,53 @@ static void RelicRush_SendGooBlindClient(CBasePlayer* pPlayer, bool bStart)
 
 void RelicRush_ClearGooBlindClient(CBasePlayer* pPlayer)
 {
+	if (!pPlayer)
+		return;
 	RelicRush_SendGooBlindClient(pPlayer, false);
+	pPlayer->m_flRelicGooBlindUntil = 0.0f;
+	pPlayer->m_iRelicGooBlindFaded = 0;
+	RelicRush_ClearGooVictimGlow(pPlayer);
+}
+
+bool RelicRush_IsPlayerGooAffected(CBasePlayer* pPlayer)
+{
+	if (!pPlayer || !pPlayer->IsAlive())
+		return false;
+	return pPlayer->m_flRelicGooBlindUntil > gpGlobals->time;
+}
+
+static float RelicRush_GetGooBlindTotalDuration()
+{
+	return g_RelicBalance.gooBlindFadeIn + g_RelicBalance.gooBlindHold + g_RelicBalance.gooBlindFade;
+}
+
+void RelicRush_ClearGooVictimGlow(CBasePlayer* pPlayer)
+{
+	if (!pPlayer || !pPlayer->m_bRelicGooVictimGlow)
+		return;
+
+	pPlayer->m_bRelicGooVictimGlow = false;
+
+	// Le porteur a son propre rendu furtif ; TickCarrier le restaurera.
+	if (RelicRush_IsCarrier(pPlayer))
+		return;
+
+	pPlayer->pev->rendermode = kRenderNormal;
+	pPlayer->pev->renderfx = kRenderFxNone;
+	pPlayer->pev->renderamt = 0;
+	pPlayer->pev->rendercolor = Vector(255, 255, 255);
+}
+
+static void RelicRush_ApplyGooVictimGlow(CBasePlayer* pPlayer)
+{
+	if (!pPlayer || !pPlayer->IsAlive() || RelicRush_IsCarrier(pPlayer))
+		return;
+
+	pPlayer->m_bRelicGooVictimGlow = true;
+	pPlayer->pev->rendermode = kRenderNormal;
+	pPlayer->pev->renderfx = kRenderFxGlowShell;
+	pPlayer->pev->renderamt = (int)g_RelicBalance.gooVictimGlowAmt;
+	pPlayer->pev->rendercolor = Vector(g_RelicBalance.gooBlindR, g_RelicBalance.gooBlindG, g_RelicBalance.gooBlindB);
 }
 
 // Fumee xen verte (sprites additifs : TE_SPRITE, pas TE_SMOKE = carre noir).
@@ -436,26 +482,35 @@ void RelicRush_BlindPlayer(CBasePlayer* pVictim)
 		return;
 
 	pVictim->m_iRelicGooBlindFaded = 0; // permet un nouveau fadeout si re-touch pendant l'effet
-	pVictim->m_flRelicGooBlindUntil = gpGlobals->time + g_RelicBalance.gooBlindHold + g_RelicBalance.gooBlindFade;
+	pVictim->m_flRelicGooBlindUntil = gpGlobals->time + RelicRush_GetGooBlindTotalDuration();
 
 	RelicRush_SendGooBlindClient(pVictim, true);
+	RelicRush_ApplyGooVictimGlow(pVictim);
 }
 
-void RelicRush_TickPlayerBlindFade(CBasePlayer* pPlayer)
+void RelicRush_TickGooVictimEffects(CBasePlayer* pPlayer)
 {
-	if (!pPlayer || !pPlayer->IsNetClient())
-		return;
-	if (pPlayer->m_flRelicGooBlindUntil <= 0.0f)
+	if (!pPlayer)
 		return;
 
-	const float flFadeStart = pPlayer->m_flRelicGooBlindUntil - g_RelicBalance.gooBlindFade;
-	if (gpGlobals->time >= flFadeStart && pPlayer->m_iRelicGooBlindFaded == 0)
-		pPlayer->m_iRelicGooBlindFaded = 1; // fadeout gere cote client (RelicBlnd)
+	if (RelicRush_IsPlayerGooAffected(pPlayer))
+	{
+		if (pPlayer->IsNetClient())
+		{
+			const float flFadeStart = pPlayer->m_flRelicGooBlindUntil - g_RelicBalance.gooBlindFade;
+			if (gpGlobals->time >= flFadeStart && pPlayer->m_iRelicGooBlindFaded == 0)
+				pPlayer->m_iRelicGooBlindFaded = 1; // fadeout gere cote client (RelicBlnd)
+		}
 
-	if (gpGlobals->time >= pPlayer->m_flRelicGooBlindUntil)
+		RelicRush_ApplyGooVictimGlow(pPlayer);
+		return;
+	}
+
+	if (pPlayer->m_flRelicGooBlindUntil > 0.0f || pPlayer->m_bRelicGooVictimGlow)
 	{
 		pPlayer->m_flRelicGooBlindUntil = 0.0f;
 		pPlayer->m_iRelicGooBlindFaded = 0;
+		RelicRush_ClearGooVictimGlow(pPlayer);
 	}
 }
 

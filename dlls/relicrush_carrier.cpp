@@ -6,6 +6,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "relicrush_carrier.h"
+#include "relicrush_goo.h"
 #include "cdll_dll.h"
 #include "UserMessages.h"
 
@@ -796,10 +797,12 @@ void RelicRush_PrecacheModSounds()
 		PRECACHE_SOUND(g_RelicCarrierScreams[i]);
 }
 
-void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, float flDamageDealt)
+void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, CBasePlayer* pVictim, float flDamageDealt)
 {
-	// Siphon de vie : uniquement le porteur actif de la relique
-	if (!pCarrier || !pCarrier->m_bHasRelic || !pCarrier->IsAlive() || flDamageDealt <= 0.0f)
+	// Siphon : porteur actif, victime sous effet goo uniquement (pendant le voile)
+	if (!pCarrier || !pVictim || !pCarrier->m_bHasRelic || !pCarrier->IsAlive() || flDamageDealt <= 0.0f)
+		return;
+	if (!RelicRush_IsPlayerGooAffected(pVictim))
 		return;
 
 	pCarrier->m_bRelicAllowHeal = true;

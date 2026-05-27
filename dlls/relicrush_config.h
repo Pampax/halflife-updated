@@ -37,6 +37,7 @@ struct RelicRushBalance
 	float gooBlindB;
 	float gooBlindBlobScale; // multiplicateur rayon des taches (client)
 	float gooBlindBlobCount; // nombre de taches affichees (1..RELIC_GOO_BLIND_BLOBS_MAX)
+	float gooVictimGlowAmt;  // halo vert sur le modele victime (renderamt)
 };
 
 extern RelicRushBalance g_RelicBalance;
