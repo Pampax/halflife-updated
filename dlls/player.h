@@ -219,6 +219,8 @@ public:
 	char m_szRelicSavedUserModel[32];
 	int m_iRelicSavedBody = 0;
 	int m_iRelicSavedSkin = 0;
+	int m_iRelicSavedTopColor = 0;
+	int m_iRelicSavedBottomColor = 0;
 	bool m_bRelicWallClinging = false;
 	bool m_bRelicLastSyncWallCling = false;
 	bool m_bRelicPendingCrowbarRush = false;

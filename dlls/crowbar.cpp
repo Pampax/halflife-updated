@@ -74,14 +74,12 @@ bool CCrowbar::GetItemInfo(ItemInfo* p)
 bool CCrowbar::Deploy()
 {
 #ifndef CLIENT_DLL
-	// Porteur de relique : aucun viewmodel (mains "invisibles" en 1ere personne, comme
-	// dans la plupart des FPS ou on ne voit pas son corps). Le punch d'angle dans Swing()
-	// simule le swing de griffe. En 3eme personne les autres voient l'animation
-	// d'attaque du modele zombie (SetAnimation(PLAYER_ATTACK1)).
+	// Porteur de relique : v_knife.mdl (OpFor, inclus dans relicrush/models/).
+	// Memes indices d'animation que la crowbar (attack1/2/3 = slash melee).
+	// Pas de p_*.mdl en 3PP : les autres voient le zombie griffer (PLAYER_ATTACK1).
 	if (m_pPlayer && m_pPlayer->m_bHasRelic)
 	{
-		const bool bOk = DefaultDeploy("models/v_crowbar.mdl", "", CROWBAR_DRAW, "crowbar");
-		m_pPlayer->pev->viewmodel = iStringNull;
+		const bool bOk = DefaultDeploy("models/v_knife.mdl", "", CROWBAR_DRAW, "crowbar");
 		m_pPlayer->pev->weaponmodel = iStringNull;
 		return bOk;
 	}

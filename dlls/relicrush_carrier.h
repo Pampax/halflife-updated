@@ -24,8 +24,15 @@ inline float RelicRush_CrowbarAttackDelay(float flNormalDelay, CBasePlayer* pPla
 	return flNormalDelay;
 }
 
-constexpr const char* RELIC_CARRIER_USERINFO_MODEL = "zombie";
-constexpr const char* RELIC_CARRIER_MONSTER_MODEL = "models/zombie.mdl";
+// Modele 3PP porteur : models/robo/robo.mdl (rgrunt + textures RG_*.bmp dans le meme dossier)
+// "robo" en userinfo = cle factice (evite que l'engine remette gina/barney).
+constexpr const char* RELIC_CARRIER_USERINFO_MODEL = "robo";
+constexpr const char* RELIC_CARRIER_MONSTER_MODEL = "models/robo/robo.mdl";
+constexpr int RELIC_CARRIER_SKIN = 0;
+// topcolor/bottomcolor a 0 cote serveur ; le client ignore StudioSetRemapColors pour robo
+// (sinon une partie du mesh suit les couleurs MP du menu, l'autre reste rouge LUT moteur).
+constexpr int RELIC_CARRIER_TOPCOLOR = 0;
+constexpr int RELIC_CARRIER_BOTTOMCOLOR = 0;
 // Ambiance relique : son Xen distinctif (les ambient_generic des maps DM peuvent
 // utiliser pulsemachine/etc., on prend un son electrique-portail clairement identifiable).
 constexpr const char* RELIC_AMBIENT_SOUND = "debris/beamstart8.wav";
@@ -44,6 +51,8 @@ inline bool RelicRush_IsCarrierMoving(CBasePlayer* pPlayer)
 void RelicRush_ResetCarrierVisuals(CBasePlayer* pPlayer);
 void RelicRush_FinalizeCarrierLoss(CBasePlayer* pPlayer);
 void RelicRush_RestorePlayMode(CBasePlayer* pPlayer);
+void RelicRush_ApplyCarrierDefaultSkin(CBasePlayer* pPlayer);
+void RelicRush_EnsureCarrierNeutralColors(CBasePlayer* pPlayer);
 void RelicRush_ApplyCarrierModel(CBasePlayer* pPlayer);
 void RelicRush_ReapplyCarrierModel(CBasePlayer* pPlayer);
 void RelicRush_RestoreCarrierModel(CBasePlayer* pPlayer);

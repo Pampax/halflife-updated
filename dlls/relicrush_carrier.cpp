@@ -25,12 +25,10 @@ static const char* g_RelicCarrierScreams[] =
 	"agrunt/ag_alert1.wav",
 	"agrunt/ag_alert2.wav",
 	"agrunt/ag_alert3.wav",
-	"weapons/ric1.wav",
-	"weapons/ric2.wav",
-	"weapons/ric3.wav",
 };
 
 static void RelicRush_SetUserinfoModel(CBasePlayer* pPlayer, const char* pszModel);
+static void RelicRush_SetUserinfoPlayerColors(CBasePlayer* pPlayer, int iTopColor, int iBottomColor);
 
 void RelicRush_ResetCarrierVisuals(CBasePlayer* pPlayer)
 {
@@ -54,9 +52,12 @@ static void RelicRush_EnsureNormalUserinfoModel(CBasePlayer* pPlayer)
 	if (pPlayer->m_szRelicSavedUserModel[0])
 	{
 		RelicRush_SetUserinfoModel(pPlayer, pPlayer->m_szRelicSavedUserModel);
+		RelicRush_SetUserinfoPlayerColors(pPlayer, pPlayer->m_iRelicSavedTopColor, pPlayer->m_iRelicSavedBottomColor);
 		pPlayer->m_szRelicSavedUserModel[0] = '\0';
 		pPlayer->m_iRelicSavedBody = 0;
 		pPlayer->m_iRelicSavedSkin = 0;
+		pPlayer->m_iRelicSavedTopColor = 0;
+		pPlayer->m_iRelicSavedBottomColor = 0;
 		return;
 	}
 
@@ -262,6 +263,40 @@ static void RelicRush_SetUserinfoModel(CBasePlayer* pPlayer, const char* pszMode
 	g_engfuncs.pfnSetClientKeyValue(pPlayer->entindex(), infobuffer, "model", pszModel);
 }
 
+static void RelicRush_SetUserinfoPlayerColors(CBasePlayer* pPlayer, int iTopColor, int iBottomColor)
+{
+	if (!pPlayer)
+		return;
+
+	char szBuf[12];
+	char* infobuffer = g_engfuncs.pfnGetInfoKeyBuffer(pPlayer->edict());
+
+	sprintf(szBuf, "%d", iTopColor);
+	g_engfuncs.pfnSetClientKeyValue(pPlayer->entindex(), infobuffer, "topcolor", szBuf);
+	sprintf(szBuf, "%d", iBottomColor);
+	g_engfuncs.pfnSetClientKeyValue(pPlayer->entindex(), infobuffer, "bottomcolor", szBuf);
+
+	pPlayer->pev->colormap = (iTopColor & 0xFF) | ((iBottomColor & 0xFF) << 8);
+}
+
+void RelicRush_EnsureCarrierNeutralColors(CBasePlayer* pPlayer)
+{
+	if (!pPlayer)
+		return;
+
+	char* infobuffer = g_engfuncs.pfnGetInfoKeyBuffer(pPlayer->edict());
+	const char* pszTop = g_engfuncs.pfnInfoKeyValue(infobuffer, "topcolor");
+	const char* pszBottom = g_engfuncs.pfnInfoKeyValue(infobuffer, "bottomcolor");
+	const int iTop = (pszTop && pszTop[0]) ? atoi(pszTop) : 0;
+	const int iBottom = (pszBottom && pszBottom[0]) ? atoi(pszBottom) : 0;
+
+	if (iTop != RELIC_CARRIER_TOPCOLOR || iBottom != RELIC_CARRIER_BOTTOMCOLOR
+		|| pPlayer->pev->colormap != 0)
+	{
+		RelicRush_SetUserinfoPlayerColors(pPlayer, RELIC_CARRIER_TOPCOLOR, RELIC_CARRIER_BOTTOMCOLOR);
+	}
+}
+
 static void RelicRush_SaveCarrierAppearance(CBasePlayer* pPlayer)
 {
 	if (!pPlayer || pPlayer->m_szRelicSavedUserModel[0])
@@ -277,6 +312,26 @@ static void RelicRush_SaveCarrierAppearance(CBasePlayer* pPlayer)
 	pPlayer->m_szRelicSavedUserModel[sizeof(pPlayer->m_szRelicSavedUserModel) - 1] = '\0';
 	pPlayer->m_iRelicSavedBody = pPlayer->pev->body;
 	pPlayer->m_iRelicSavedSkin = pPlayer->pev->skin;
+
+	char* infobuffer = g_engfuncs.pfnGetInfoKeyBuffer(pPlayer->edict());
+	const char* pszTop = g_engfuncs.pfnInfoKeyValue(infobuffer, "topcolor");
+	const char* pszBottom = g_engfuncs.pfnInfoKeyValue(infobuffer, "bottomcolor");
+	pPlayer->m_iRelicSavedTopColor = (pszTop && pszTop[0]) ? atoi(pszTop) : 0;
+	pPlayer->m_iRelicSavedBottomColor = (pszBottom && pszBottom[0]) ? atoi(pszBottom) : 0;
+}
+
+void RelicRush_ApplyCarrierDefaultSkin(CBasePlayer* pPlayer)
+{
+	if (!pPlayer)
+		return;
+
+	pPlayer->pev->skin = RELIC_CARRIER_SKIN;
+	pPlayer->pev->body = 0;
+	pPlayer->pev->rendermode = kRenderNormal;
+	pPlayer->pev->renderfx = kRenderFxNone;
+	pPlayer->pev->rendercolor = Vector(255, 255, 255);
+	pPlayer->pev->renderamt = 255;
+	RelicRush_SetUserinfoPlayerColors(pPlayer, RELIC_CARRIER_TOPCOLOR, RELIC_CARRIER_BOTTOMCOLOR);
 }
 
 void RelicRush_ApplyCarrierModel(CBasePlayer* pPlayer)
@@ -287,9 +342,8 @@ void RelicRush_ApplyCarrierModel(CBasePlayer* pPlayer)
 	RelicRush_SaveCarrierAppearance(pPlayer);
 	RelicRush_SetUserinfoModel(pPlayer, RELIC_CARRIER_USERINFO_MODEL);
 	SET_MODEL(ENT(pPlayer->pev), RELIC_CARRIER_MONSTER_MODEL);
-	pPlayer->pev->body = 0;
-	pPlayer->pev->skin = 0;
 	pPlayer->pev->sequence = pPlayer->LookupActivity(ACT_IDLE);
+	RelicRush_ApplyCarrierDefaultSkin(pPlayer);
 	RelicRush_SetPlayerHull(pPlayer);
 }
 
@@ -300,8 +354,8 @@ void RelicRush_ReapplyCarrierModel(CBasePlayer* pPlayer)
 
 	RelicRush_SetUserinfoModel(pPlayer, RELIC_CARRIER_USERINFO_MODEL);
 	SET_MODEL(ENT(pPlayer->pev), RELIC_CARRIER_MONSTER_MODEL);
-	pPlayer->pev->body = 0;
-	pPlayer->pev->skin = 0;
+	RelicRush_ApplyCarrierDefaultSkin(pPlayer);
+	RelicRush_EnsureCarrierNeutralColors(pPlayer);
 	RelicRush_SetPlayerHull(pPlayer);
 }
 
@@ -315,9 +369,12 @@ void RelicRush_RestoreCarrierModel(CBasePlayer* pPlayer)
 	// pas dans la table de precache sous le nom direct (Host_Error: no precache).
 	// L'engine appliquera le bon modele au prochain respawn (ClientPutInServer).
 	RelicRush_SetUserinfoModel(pPlayer, pPlayer->m_szRelicSavedUserModel);
+	RelicRush_SetUserinfoPlayerColors(pPlayer, pPlayer->m_iRelicSavedTopColor, pPlayer->m_iRelicSavedBottomColor);
 	pPlayer->m_szRelicSavedUserModel[0] = '\0';
 	pPlayer->m_iRelicSavedBody = 0;
 	pPlayer->m_iRelicSavedSkin = 0;
+	pPlayer->m_iRelicSavedTopColor = 0;
+	pPlayer->m_iRelicSavedBottomColor = 0;
 	RelicRush_SetPlayerHull(pPlayer);
 }
 
@@ -385,9 +442,12 @@ void RelicRush_UpdateCarrierStealth(CBasePlayer* pPlayer)
 	const int iStealthAmt = (int)g_RelicBalance.stealthRenderAmt;
 	const int iGlowAmt = (int)g_RelicBalance.glowRenderAmt;
 	const Vector glowColor(g_RelicBalance.glowR, g_RelicBalance.glowG, g_RelicBalance.glowB);
+	const Vector kNeutralColor(255, 255, 255);
 
 	if (flNow < flVisibleEnd)
 	{
+		pPlayer->pev->skin = RELIC_CARRIER_SKIN;
+		pPlayer->pev->body = 0;
 		pPlayer->pev->rendermode = kRenderNormal;
 		pPlayer->pev->renderfx = kRenderFxGlowShell;
 		pPlayer->pev->renderamt = iGlowAmt;
@@ -400,9 +460,11 @@ void RelicRush_UpdateCarrierStealth(CBasePlayer* pPlayer)
 		const float t = (flNow - flVisibleEnd) / g_RelicBalance.stealthFadeDuration;
 		const float flInv = 1.0f - t;
 
+		pPlayer->pev->skin = RELIC_CARRIER_SKIN;
+		pPlayer->pev->body = 0;
 		pPlayer->pev->rendermode = kRenderTransTexture;
 		pPlayer->pev->renderamt = (int)(iStealthAmt + (iGlowAmt - iStealthAmt) * flInv);
-		pPlayer->pev->rendercolor = glowColor * flInv;
+		pPlayer->pev->rendercolor = kNeutralColor;
 
 		if (t < 0.5f)
 			pPlayer->pev->renderfx = kRenderFxGlowShell;
@@ -412,10 +474,12 @@ void RelicRush_UpdateCarrierStealth(CBasePlayer* pPlayer)
 		return;
 	}
 
+	pPlayer->pev->skin = RELIC_CARRIER_SKIN;
+	pPlayer->pev->body = 0;
 	pPlayer->pev->rendermode = kRenderTransTexture;
 	pPlayer->pev->renderfx = kRenderFxNone;
 	pPlayer->pev->renderamt = iStealthAmt;
-	pPlayer->pev->rendercolor = g_vecZero;
+	pPlayer->pev->rendercolor = kNeutralColor;
 }
 
 void RelicRush_OnCarrierCrowbarUsed(CBasePlayer* pPlayer)

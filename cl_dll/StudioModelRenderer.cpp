@@ -33,6 +33,14 @@ extern extra_player_info_t g_PlayerExtraInfo[MAX_PLAYERS_HUD + 1];
 
 int m_nPlayerGaitSequences[MAX_PLAYERS];
 
+// Relic Rush : models/robo/robo.mdl = rgrunt interne (textures RG_*.bmp), pas un skin MP.
+static bool Studio_IsRoboCarrierModel(const model_t* pModel)
+{
+	if (!pModel || !pModel->name)
+		return false;
+	return strstr(pModel->name, "robo") != nullptr || strstr(pModel->name, "rgrunt") != nullptr;
+}
+
 // Global engine <-> studio model rendering code interface
 engine_studio_api_t IEngineStudio;
 
@@ -1421,9 +1429,13 @@ bool CStudioModelRenderer::StudioDrawPlayer(int flags, entity_state_t* pplayer)
 
 	m_pRenderModel = IEngineStudio.SetupPlayerModel(m_nPlayerIndex);
 
-
 	if (m_pRenderModel == NULL)
 		return false;
+
+	// Porteur : le serveur SET_MODEL models/robo/robo.mdl ; ne pas laisser SetupPlayerModel
+	// remplacer par un modele joueur MP (body=1 casque = variante rouge).
+	if (m_pCurrentEntity->model && Studio_IsRoboCarrierModel(m_pCurrentEntity->model))
+		m_pRenderModel = m_pCurrentEntity->model;
 
 	m_pStudioHeader = (studiohdr_t*)IEngineStudio.Mod_Extradata(m_pRenderModel);
 	IEngineStudio.StudioSetHeader(m_pStudioHeader);
@@ -1496,15 +1508,25 @@ bool CStudioModelRenderer::StudioDrawPlayer(int flags, entity_state_t* pplayer)
 
 	if ((flags & STUDIO_RENDER) != 0)
 	{
-		if (0 != m_pCvarHiModels->value && m_pRenderModel != m_pCurrentEntity->model)
+		if (!Studio_IsRoboCarrierModel(m_pRenderModel)
+			&& !(m_pCurrentEntity->model && Studio_IsRoboCarrierModel(m_pCurrentEntity->model)))
 		{
-			// show highest resolution multiplayer model
-			m_pCurrentEntity->curstate.body = 255;
-		}
+			if (0 != m_pCvarHiModels->value && m_pRenderModel != m_pCurrentEntity->model)
+			{
+				// show highest resolution multiplayer model
+				m_pCurrentEntity->curstate.body = 255;
+			}
 
-		if (!(m_pCvarDeveloper->value == 0 && gEngfuncs.GetMaxClients() == 1) && (m_pRenderModel == m_pCurrentEntity->model))
+			if (!(m_pCvarDeveloper->value == 0 && gEngfuncs.GetMaxClients() == 1)
+				&& (m_pRenderModel == m_pCurrentEntity->model))
+			{
+				m_pCurrentEntity->curstate.body = 1; // force helmet
+			}
+		}
+		else
 		{
-			m_pCurrentEntity->curstate.body = 1; // force helmet
+			m_pCurrentEntity->curstate.body = 0;
+			m_pCurrentEntity->curstate.skin = 0;
 		}
 
 		lighting.plightvec = dir;
@@ -1517,22 +1539,29 @@ bool CStudioModelRenderer::StudioDrawPlayer(int flags, entity_state_t* pplayer)
 
 		m_pPlayerInfo = IEngineStudio.PlayerInfo(m_nPlayerIndex);
 
-		// get remap colors
-		m_nTopColor = m_pPlayerInfo->topcolor;
-		m_nBottomColor = m_pPlayerInfo->bottomcolor;
+		// Porteur robo/rgrunt : ne PAS appeler StudioSetRemapColors.
+		// Ce remap (topcolor/bottomcolor) teinte des plages de palette "chemise/pantalon"
+		// joueur MP — d'ou une partie modifiable (bleu/noir) et une partie rouge fixe
+		// (index 0 du LUT moteur). Les textures RG_*.bmp definissent la couleur seules.
+		const bool bRoboCarrier = Studio_IsRoboCarrierModel(m_pRenderModel)
+			|| (m_pCurrentEntity->model && Studio_IsRoboCarrierModel(m_pCurrentEntity->model));
 
+		if (!bRoboCarrier)
+		{
+			m_nTopColor = m_pPlayerInfo->topcolor;
+			m_nBottomColor = m_pPlayerInfo->bottomcolor;
 
-		// bounds check
-		if (m_nTopColor < 0)
-			m_nTopColor = 0;
-		if (m_nTopColor > 360)
-			m_nTopColor = 360;
-		if (m_nBottomColor < 0)
-			m_nBottomColor = 0;
-		if (m_nBottomColor > 360)
-			m_nBottomColor = 360;
+			if (m_nTopColor < 0)
+				m_nTopColor = 0;
+			if (m_nTopColor > 360)
+				m_nTopColor = 360;
+			if (m_nBottomColor < 0)
+				m_nBottomColor = 0;
+			if (m_nBottomColor > 360)
+				m_nBottomColor = 360;
 
-		IEngineStudio.StudioSetRemapColors(m_nTopColor, m_nBottomColor);
+			IEngineStudio.StudioSetRemapColors(m_nTopColor, m_nBottomColor);
+		}
 
 		StudioRenderModel();
 		m_pPlayerInfo = NULL;

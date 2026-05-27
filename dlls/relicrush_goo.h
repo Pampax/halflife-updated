@@ -20,11 +20,18 @@ constexpr int RELIC_DECAL_MIN_TILES = 1;	  // ~ 0.5 m^2
 constexpr int RELIC_DECAL_MAX_TILES = 5;	  // ~ 2 m^2 (groupe de tiles)
 constexpr float RELIC_DECAL_TILE_SPACING = 24.0f; // offset des tiles secondaires (units HL)
 
-// Sons (vanilla HL, presents sur toutes les installs steam standard)
+// Eclaboussure a l'impact (decals verts repartis autour du point d'explosion)
+constexpr float RELIC_GOO_SPLASH_DECAL_RADIUS = 100.0f;
+constexpr int RELIC_GOO_SPLASH_DECAL_MIN = 8;
+constexpr int RELIC_GOO_SPLASH_DECAL_MAX = 14;
+
+// Sons (vanilla HL) : tir = lanceur, impact = flaque / eau (pl_slosh, pl_wade)
 constexpr const char* RELIC_GOO_FIRE_SOUND = "weapons/glauncher.wav";
-constexpr const char* RELIC_GOO_IMPACT_SOUND_1 = "debris/flesh1.wav";
-constexpr const char* RELIC_GOO_IMPACT_SOUND_2 = "debris/flesh2.wav";
-constexpr const char* RELIC_GOO_IMPACT_SOUND_3 = "debris/flesh3.wav";
+constexpr const char* RELIC_GOO_IMPACT_SOUND_1 = "player/pl_slosh1.wav";
+constexpr const char* RELIC_GOO_IMPACT_SOUND_2 = "player/pl_slosh2.wav";
+constexpr const char* RELIC_GOO_IMPACT_SOUND_3 = "player/pl_slosh3.wav";
+constexpr const char* RELIC_GOO_IMPACT_SOUND_4 = "player/pl_slosh4.wav";
+constexpr const char* RELIC_GOO_IMPACT_SOUND_DEEP = "player/pl_wade1.wav";
 
 class CRelicGooProjectile : public CBaseEntity
 {

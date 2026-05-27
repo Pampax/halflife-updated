@@ -46,15 +46,21 @@ CRelicRushMultiplay::CRelicRushMultiplay()
 	// Precache pendant InstallGameRules (phase precache map), pas en jeu.
 	PRECACHE_MODEL("models/w_antidote.mdl");
 	PRECACHE_MODEL(RELIC_CARRIER_MONSTER_MODEL);
-	// Le porteur n'a pas de viewmodel (mains "invisibles" en 1ere personne).
-	// La crowbar sert uniquement de support a la mecanique d'attaque (degats, sons,
-	// swing 3eme personne via PLAYER_ATTACK1 sur le modele zombie). Voir CCrowbar::Deploy().
+	// Viewmodel porteur : couteau OpFor (slash melee, meme seq que crowbar). Fichier
+	// relicrush/models/v_knife.mdl — pas besoin d'OpFor installe chez les joueurs.
+	PRECACHE_MODEL("models/v_knife.mdl");
 	RelicRush_PrecacheModSounds();
 	RelicRush_PrecacheGooAssets();
 }
 
 void CRelicRushMultiplay::ClientUserInfoChanged(CBasePlayer* pPlayer, char* infobuffer)
 {
+	if (RelicRush_IsCarrier(pPlayer))
+	{
+		g_engfuncs.pfnSetClientKeyValue(pPlayer->entindex(), infobuffer, "topcolor", "0");
+		g_engfuncs.pfnSetClientKeyValue(pPlayer->entindex(), infobuffer, "bottomcolor", "0");
+	}
+
 	CHalfLifeMultiplay::ClientUserInfoChanged(pPlayer, infobuffer);
 
 	if (RelicRush_IsCarrier(pPlayer))
@@ -289,12 +295,10 @@ void CRelicRushMultiplay::SetCarrier(CBasePlayer* pPlayer)
 	pPlayer->m_flNextRelicClientSync = 0.0f;
 	pPlayer->m_bRelicLastSyncWallCling = false;
 
-	// Cache view/weapon models : ApplyCarrierLoadout a deja appele Deploy() AVANT
-	// que m_bHasRelic soit true, donc la crowbar a pose les modeles normaux.
-	// On efface maintenant que le flag est pose (vue 1ere personne sans arme).
+	// Swap viewmodel couteau : ApplyCarrierLoadout a deploye v_crowbar avant m_bHasRelic.
 	if (pPlayer->m_pActiveItem && pPlayer->m_pActiveItem->m_iId == WEAPON_CROWBAR)
 	{
-		pPlayer->pev->viewmodel = iStringNull;
+		pPlayer->pev->viewmodel = MAKE_STRING("models/v_knife.mdl");
 		pPlayer->pev->weaponmodel = iStringNull;
 	}
 
@@ -444,10 +448,9 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 		ApplyCarrierLoadout(pPlayer);
 		pPlayer->m_bHasRelic = true;
 		ApplyCarrierEffects(pPlayer, true);
-		// Cache view/weapon models : ApplyCarrierLoadout a recharge les modeles normaux.
 		if (pPlayer->m_pActiveItem && pPlayer->m_pActiveItem->m_iId == WEAPON_CROWBAR)
 		{
-			pPlayer->pev->viewmodel = iStringNull;
+			pPlayer->pev->viewmodel = MAKE_STRING("models/v_knife.mdl");
 			pPlayer->pev->weaponmodel = iStringNull;
 		}
 	}
@@ -494,22 +497,28 @@ void CRelicRushMultiplay::TickCarrier(CBasePlayer* pPlayer)
 		g_engfuncs.pfnGetInfoKeyBuffer(pPlayer->edict()), "model");
 	if (!pszModel || stricmp(pszModel, RELIC_CARRIER_USERINFO_MODEL) != 0)
 		RelicRush_ReapplyCarrierModel(pPlayer);
+	else
+		RelicRush_EnsureCarrierNeutralColors(pPlayer);
 
 	RelicRush_UpdateCarrierStealth(pPlayer);
 	RelicRush_TickCarrierScreams(pPlayer);
 
+	// Perte de vie passive (rr_regen_interval + rr_regen_amount, ex. 1 HP/s).
+	// Seul le siphon sur coups (crowbar) restaure — voir RelicRush_ApplySiphonHeal.
 	if (gpGlobals->time >= pPlayer->m_flNextRelicRegen)
 	{
 		pPlayer->m_flNextRelicRegen = gpGlobals->time + g_RelicBalance.regenInterval;
 
-		if (pPlayer->pev->health < g_RelicBalance.maxHealth)
+		const float flDrain = g_RelicBalance.regenAmount;
+		if (flDrain > 0.0f && pPlayer->pev->health > 0.0f)
 		{
-			pPlayer->m_bRelicAllowHeal = true;
-			pPlayer->pev->health = V_min(pPlayer->pev->health + g_RelicBalance.regenAmount, g_RelicBalance.maxHealth);
-			pPlayer->m_bRelicAllowHeal = false;
+			pPlayer->pev->health = V_max(0.0f, pPlayer->pev->health - flDrain);
 			pPlayer->m_iClientHealth = -1;
 			pPlayer->UpdateClientData();
 			RelicRush_SyncCarrierClient(pPlayer);
+
+			if (pPlayer->pev->health <= 0.0f)
+				pPlayer->Killed(pPlayer->pev, 0);
 		}
 	}
 

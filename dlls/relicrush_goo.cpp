@@ -3,7 +3,7 @@
  *
  * Pattern projectile inspire de CRpgRocket (rpg.cpp) + CGrenade::Explode (ggrenade.cpp),
  * mais sans homing, sans degats, et avec effets verts (decals "spit", screen fade vert,
- * son d'impact "fleshy").
+ * son d'impact liquide (pl_slosh / pl_wade), decals repandus en zone).
  ***/
 #include "extdll.h"
 #include "util.h"
@@ -22,6 +22,104 @@ LINK_ENTITY_TO_CLASS(relic_goo, CRelicGooProjectile);
 // Couleur verte commune (decal/fade/glow)
 static const Vector kRelicGooColor(32, 220, 72);
 
+static int RelicRush_PickGooDecal()
+{
+	return (RANDOM_LONG(0, 1) == 0) ? DECAL_SPIT1 : DECAL_SPIT2;
+}
+
+// Pose un decal vert si le trace touche une surface BSP.
+static void RelicRush_TryGooDecalTrace(const Vector& vecStart, const Vector& vecEnd, edict_t* pSkip)
+{
+	TraceResult tr;
+	UTIL_TraceLine(vecStart, vecEnd, ignore_monsters, pSkip, &tr);
+	if (tr.flFraction < 1.0f)
+		UTIL_DecalTrace(&tr, RelicRush_PickGooDecal());
+}
+
+// Eclaboussures vertes reparties dans une sphere autour de l'impact (sol, murs, plafond).
+static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCenterHit, edict_t* pSkip)
+{
+	if (pCenterHit && pCenterHit->flFraction < 1.0f)
+	{
+		UTIL_DecalTrace(pCenterHit, RelicRush_PickGooDecal());
+
+		const Vector wallN = pCenterHit->vecPlaneNormal;
+		Vector right, up;
+		if (fabs(wallN.z) > 0.7f)
+		{
+			right = Vector(1, 0, 0);
+			up = Vector(0, 1, 0);
+		}
+		else
+		{
+			right = CrossProduct(wallN, Vector(0, 0, 1));
+			if (right.Length() < 0.01f)
+				right = Vector(1, 0, 0);
+			else
+				right = right.Normalize();
+			up = CrossProduct(right, wallN).Normalize();
+		}
+
+		for (int c = 0; c < RANDOM_LONG(2, 4); c++)
+		{
+			const Vector vecOff = pCenterHit->vecEndPos
+				+ right * RANDOM_FLOAT(-36.0f, 36.0f)
+				+ up * RANDOM_FLOAT(-36.0f, 36.0f)
+				+ wallN * 4.0f;
+			RelicRush_TryGooDecalTrace(vecOff, vecOff - wallN * 24.0f, pSkip);
+		}
+	}
+
+	const int nSplats = RANDOM_LONG(RELIC_GOO_SPLASH_DECAL_MIN, RELIC_GOO_SPLASH_DECAL_MAX);
+	const float flRadius = RELIC_GOO_SPLASH_DECAL_RADIUS;
+
+	for (int i = 0; i < nSplats; i++)
+	{
+		// Point aleatoire dans une boule autour de l'explosion
+		Vector dir(
+			RANDOM_FLOAT(-1.0f, 1.0f),
+			RANDOM_FLOAT(-1.0f, 1.0f),
+			RANDOM_FLOAT(-1.0f, 1.0f));
+		const float flLen = dir.Length();
+		if (flLen < 0.01f)
+			continue;
+		dir = dir * (RANDOM_FLOAT(flRadius * 0.25f, flRadius) / flLen);
+
+		const Vector vecProbe = vecOrigin + dir;
+		RelicRush_TryGooDecalTrace(vecProbe, vecProbe - dir * 1.15f, pSkip);
+	}
+
+	// Renfort vers le sol sous l'impact (flaque au sol)
+	for (int f = 0; f < 3; f++)
+	{
+		const Vector vecFloorStart = vecOrigin + Vector(
+			RANDOM_FLOAT(-flRadius * 0.6f, flRadius * 0.6f),
+			RANDOM_FLOAT(-flRadius * 0.6f, flRadius * 0.6f),
+			8.0f);
+		RelicRush_TryGooDecalTrace(vecFloorStart, vecFloorStart - Vector(0, 0, 72.0f), pSkip);
+	}
+}
+
+static void RelicRush_PlayGooImpactSounds(const Vector& vecOrigin, edict_t* pEnt)
+{
+	static const char* kSlosh[] =
+	{
+		RELIC_GOO_IMPACT_SOUND_1,
+		RELIC_GOO_IMPACT_SOUND_2,
+		RELIC_GOO_IMPACT_SOUND_3,
+		RELIC_GOO_IMPACT_SOUND_4,
+	};
+	const char* pszMain = kSlosh[RANDOM_LONG(0, ARRAYSIZE(kSlosh) - 1)];
+
+	// Impact principal : eclaboussure / flaque (pl_slosh)
+	EMIT_SOUND_DYN(pEnt, CHAN_VOICE, pszMain, 1.0f, ATTN_NORM, 0, RANDOM_LONG(92, 108));
+	// Couche grave + etouffee (pl_wade) pour le "splash" de masse
+	EMIT_SOUND_DYN(pEnt, CHAN_BODY, RELIC_GOO_IMPACT_SOUND_DEEP, 0.75f, ATTN_NORM, 0, RANDOM_LONG(78, 92));
+	// Petite goutte / fin d'impact
+	EMIT_SOUND_DYN(pEnt, CHAN_STATIC, kSlosh[RANDOM_LONG(0, ARRAYSIZE(kSlosh) - 1)],
+		0.45f, ATTN_NORM, 0, RANDOM_LONG(105, 120));
+}
+
 void CRelicGooProjectile::Precache()
 {
 	PRECACHE_MODEL("models/grenade.mdl");
@@ -29,6 +127,8 @@ void CRelicGooProjectile::Precache()
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_1);
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_2);
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_3);
+	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_4);
+	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_DEEP);
 }
 
 void CRelicGooProjectile::Spawn()
@@ -98,57 +198,14 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 	WRITE_BYTE(80);				   // decay
 	MESSAGE_END();
 
-	// Petit nuage de bulles vert vif (TE_BUBBLES) : effet de splatter sans dependance sprite.
-	MESSAGE_BEGIN(MSG_PAS, SVC_TEMPENTITY, pev->origin);
-	WRITE_BYTE(TE_SPARKS);
-	WRITE_COORD(pev->origin.x);
-	WRITE_COORD(pev->origin.y);
-	WRITE_COORD(pev->origin.z);
-	MESSAGE_END();
+	// Bulles / gouttelettes (effet liquide, meme hors de l'eau — le moteur affiche quand meme).
+	UTIL_Bubbles(
+		pev->origin - Vector(48, 48, 24),
+		pev->origin + Vector(48, 48, 48),
+		RANDOM_LONG(12, 20));
 
-	// Son d'impact aleatoire (3 variantes liquides).
-	const char* pszImpact = RELIC_GOO_IMPACT_SOUND_1;
-	switch (RANDOM_LONG(0, 2))
-	{
-	case 0: pszImpact = RELIC_GOO_IMPACT_SOUND_1; break;
-	case 1: pszImpact = RELIC_GOO_IMPACT_SOUND_2; break;
-	case 2: pszImpact = RELIC_GOO_IMPACT_SOUND_3; break;
-	}
-	EMIT_SOUND_DYN(ENT(pev), CHAN_VOICE, pszImpact, 0.95f, ATTN_NORM, 0, RANDOM_LONG(85, 100));
-	// Surcouche basse plus lente pour effet "blob".
-	EMIT_SOUND_DYN(ENT(pev), CHAN_BODY, pszImpact, 0.6f, ATTN_NORM, 0, 60);
-
-	// Decal vert (crachat alien) sur la surface impactee, taille moyenne (2 tiles).
-	if (pTrace && pTrace->flFraction < 1.0f)
-	{
-		const int iDecal = (RANDOM_LONG(0, 1) == 0) ? DECAL_SPIT1 : DECAL_SPIT2;
-		UTIL_DecalTrace(pTrace, iDecal);
-
-		// Quelques eclaboussures secondaires autour pour grossir la tache.
-		const Vector wallN = pTrace->vecPlaneNormal;
-		Vector right(1, 0, 0), up(0, 0, 1);
-		if (fabs(wallN.z) > 0.7f)
-		{
-			right = Vector(1, 0, 0);
-			up = Vector(0, 1, 0);
-		}
-		else
-		{
-			right = CrossProduct(wallN, Vector(0, 0, 1)).Normalize();
-			up = CrossProduct(right, wallN).Normalize();
-		}
-		const int nExtra = RANDOM_LONG(1, 3);
-		for (int i = 0; i < nExtra; i++)
-		{
-			const float dx = RANDOM_FLOAT(-32.0f, 32.0f);
-			const float dy = RANDOM_FLOAT(-32.0f, 32.0f);
-			const Vector vecOff = pTrace->vecEndPos + right * dx + up * dy + wallN * 4.0f;
-			TraceResult tr2;
-			UTIL_TraceLine(vecOff, vecOff - wallN * 16.0f, ignore_monsters, ENT(pev), &tr2);
-			if (tr2.flFraction < 1.0f)
-				UTIL_DecalTrace(&tr2, (RANDOM_LONG(0, 1) == 0) ? DECAL_SPIT1 : DECAL_SPIT2);
-		}
-	}
+	RelicRush_PlayGooImpactSounds(pev->origin, ENT(pev));
+	RelicRush_SplashGooDecals(pev->origin, pTrace, ENT(pev));
 
 	// Aveuglement AoE : tous les joueurs dans le rayon (proprietaire epargne).
 	CBaseEntity* pEnt = nullptr;
@@ -221,6 +278,8 @@ void RelicRush_PrecacheGooAssets()
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_1);
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_2);
 	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_3);
+	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_4);
+	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_DEEP);
 }
 
 void RelicRush_FireGoo(CBasePlayer* pCarrier)

@@ -6,7 +6,7 @@
 #include "relicrush_config.h"
 
 RelicRushBalance g_RelicBalance = {
-	250.0f, 1.0f, 5.0f, 5.0f, 8.0f,
+	250.0f, 1.0f, 1.0f, 5.0f, 8.0f,
 	12.0f, 55.0f, 64.0f, 255.0f, 64.0f,
 	900.0f, 0.35f, 128.0f, 200.0f, -140.0f,
 	300.0f, 6.0f,
@@ -15,7 +15,7 @@ RelicRushBalance g_RelicBalance = {
 
 static cvar_t rr_maxhealth = {"rr_maxhealth", "250", FCVAR_SERVER};
 static cvar_t rr_regen_interval = {"rr_regen_interval", "1", FCVAR_SERVER};
-static cvar_t rr_regen_amount = {"rr_regen_amount", "5", FCVAR_SERVER};
+static cvar_t rr_regen_amount = {"rr_regen_amount", "1", FCVAR_SERVER};
 static cvar_t rr_crowbar_rate = {"rr_crowbar_rate", "5", FCVAR_SERVER};
 static cvar_t rr_move_thresh = {"rr_move_thresh", "8", FCVAR_SERVER};
 static cvar_t rr_stealth_renderamt = {"rr_stealth_renderamt", "12", FCVAR_SERVER};
