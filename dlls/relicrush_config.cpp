@@ -11,6 +11,8 @@ RelicRushBalance g_RelicBalance = {
 	900.0f, 0.35f, 128.0f, 200.0f, -140.0f,
 	300.0f, 6.0f,
 	3.0f, 3.0f, 10.0f, 1.0f,
+	140.0f, 3.0f, 1.0f, 0.15f, 255.0f, 0.0f, 255.0f, 0.0f,
+	0.45f, 18.0f,
 };
 
 static cvar_t rr_maxhealth = {"rr_maxhealth", "250", FCVAR_SERVER};
@@ -34,6 +36,16 @@ static cvar_t rr_visible_time = {"rr_visible_time", "3", FCVAR_SERVER};
 static cvar_t rr_sound_min = {"rr_sound_min", "3", FCVAR_SERVER};
 static cvar_t rr_sound_max = {"rr_sound_max", "10", FCVAR_SERVER};
 static cvar_t rr_stealth_fade = {"rr_stealth_fade", "1", FCVAR_SERVER};
+static cvar_t rr_goo_aoe_radius = {"rr_goo_aoe_radius", "140", FCVAR_SERVER};
+static cvar_t rr_goo_blind_hold = {"rr_goo_blind_hold", "3", FCVAR_SERVER};
+static cvar_t rr_goo_blind_fade = {"rr_goo_blind_fade", "1", FCVAR_SERVER};
+static cvar_t rr_goo_blind_fadein = {"rr_goo_blind_fadein", "0.15", FCVAR_SERVER};
+static cvar_t rr_goo_blind_alpha = {"rr_goo_blind_alpha", "255", FCVAR_SERVER};
+static cvar_t rr_goo_blind_r = {"rr_goo_blind_r", "0", FCVAR_SERVER};
+static cvar_t rr_goo_blind_g = {"rr_goo_blind_g", "255", FCVAR_SERVER};
+static cvar_t rr_goo_blind_b = {"rr_goo_blind_b", "0", FCVAR_SERVER};
+static cvar_t rr_goo_blind_blob_scale = {"rr_goo_blind_blob_scale", "0.45", FCVAR_SERVER};
+static cvar_t rr_goo_blind_blob_count = {"rr_goo_blind_blob_count", "18", FCVAR_SERVER};
 
 static float RR_ClampCvar(const char* name, float value, float minVal, float maxVal)
 {
@@ -82,6 +94,16 @@ void RelicRush_RefreshBalance()
 	if (g_RelicBalance.soundIntervalMax < g_RelicBalance.soundIntervalMin)
 		g_RelicBalance.soundIntervalMax = g_RelicBalance.soundIntervalMin;
 	g_RelicBalance.stealthFadeDuration = RR_ClampCvar("rr_stealth_fade", CVAR_GET_FLOAT("rr_stealth_fade"), 0.0f, 5.0f);
+	g_RelicBalance.gooAoeRadius = RR_ClampCvar("rr_goo_aoe_radius", CVAR_GET_FLOAT("rr_goo_aoe_radius"), 32.0f, 512.0f);
+	g_RelicBalance.gooBlindHold = RR_ClampCvar("rr_goo_blind_hold", CVAR_GET_FLOAT("rr_goo_blind_hold"), 0.0f, 30.0f);
+	g_RelicBalance.gooBlindFade = RR_ClampCvar("rr_goo_blind_fade", CVAR_GET_FLOAT("rr_goo_blind_fade"), 0.0f, 10.0f);
+	g_RelicBalance.gooBlindFadeIn = RR_ClampCvar("rr_goo_blind_fadein", CVAR_GET_FLOAT("rr_goo_blind_fadein"), 0.0f, 3.0f);
+	g_RelicBalance.gooBlindAlpha = RR_ClampCvar("rr_goo_blind_alpha", CVAR_GET_FLOAT("rr_goo_blind_alpha"), 1.0f, 255.0f);
+	g_RelicBalance.gooBlindR = RR_ClampCvar("rr_goo_blind_r", CVAR_GET_FLOAT("rr_goo_blind_r"), 0.0f, 255.0f);
+	g_RelicBalance.gooBlindG = RR_ClampCvar("rr_goo_blind_g", CVAR_GET_FLOAT("rr_goo_blind_g"), 0.0f, 255.0f);
+	g_RelicBalance.gooBlindB = RR_ClampCvar("rr_goo_blind_b", CVAR_GET_FLOAT("rr_goo_blind_b"), 0.0f, 255.0f);
+	g_RelicBalance.gooBlindBlobScale = RR_ClampCvar("rr_goo_blind_blob_scale", CVAR_GET_FLOAT("rr_goo_blind_blob_scale"), 0.15f, 1.5f);
+	g_RelicBalance.gooBlindBlobCount = RR_ClampCvar("rr_goo_blind_blob_count", CVAR_GET_FLOAT("rr_goo_blind_blob_count"), 1.0f, 24.0f);
 }
 
 void RelicRush_RegisterBalanceCvars()
@@ -107,6 +129,16 @@ void RelicRush_RegisterBalanceCvars()
 	CVAR_REGISTER(&rr_sound_min);
 	CVAR_REGISTER(&rr_sound_max);
 	CVAR_REGISTER(&rr_stealth_fade);
+	CVAR_REGISTER(&rr_goo_aoe_radius);
+	CVAR_REGISTER(&rr_goo_blind_hold);
+	CVAR_REGISTER(&rr_goo_blind_fade);
+	CVAR_REGISTER(&rr_goo_blind_fadein);
+	CVAR_REGISTER(&rr_goo_blind_alpha);
+	CVAR_REGISTER(&rr_goo_blind_r);
+	CVAR_REGISTER(&rr_goo_blind_g);
+	CVAR_REGISTER(&rr_goo_blind_b);
+	CVAR_REGISTER(&rr_goo_blind_blob_scale);
+	CVAR_REGISTER(&rr_goo_blind_blob_count);
 
 	SERVER_COMMAND("exec relicrush_balance.cfg\n");
 	RelicRush_RefreshBalance();

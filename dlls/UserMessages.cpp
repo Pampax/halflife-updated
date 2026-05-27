@@ -69,9 +69,10 @@ void LinkUserMessages()
 	gmsgRelicCarrier = REG_USER_MSG("RelicCarr", 1);
 	gmsgRelicSync = REG_USER_MSG("RelicSyn", 3);
 	gmsgRelicGoo = REG_USER_MSG("RelicGoo", 1);
+	gmsgRelicBlnd = REG_USER_MSG("RelicBlnd", 10);
 
-	if (gmsgRelicCarrier <= 0 || gmsgRelicSync <= 0 || gmsgRelicGoo <= 0)
-		ALERT(at_error, "Relic Rush: echec enregistrement messages RelicCarr/RelicSyn/RelicGoo\n");
+	if (gmsgRelicCarrier <= 0 || gmsgRelicSync <= 0 || gmsgRelicGoo <= 0 || gmsgRelicBlnd <= 0)
+		ALERT(at_error, "Relic Rush: echec enregistrement messages RelicCarr/RelicSyn/RelicGoo/RelicBlnd\n");
 
 	RelicRush_RegisterServerCommands();
 }

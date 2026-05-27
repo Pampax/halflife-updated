@@ -221,6 +221,11 @@ bool CRelicRushMultiplay::ClientCommand(CBasePlayer* pPlayer, const char* pcmd)
 				(int)g_RelicBalance.glowRenderAmt));
 		return true;
 	}
+	if (FStrEq(pcmd, "rr_poison"))
+	{
+		RelicRush_TestPoisonOnSelf(pPlayer);
+		return true;
+	}
 	return CHalfLifeMultiplay::ClientCommand(pPlayer, pcmd);
 }
 Vector CRelicRushMultiplay::GetRelicSpawnOrigin() const
@@ -423,10 +428,7 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 		pPlayer->m_flRelicGooBlindUntil = 0.0f;
 		pPlayer->m_iRelicGooBlindFaded = 0;
 		if (pPlayer->IsNetClient())
-		{
-			static const Vector kClear(0, 0, 0);
-			UTIL_ScreenFade(pPlayer, kClear, 0.1f, 0.0f, 0, FFADE_OUT);
-		}
+			RelicRush_ClearGooBlindClient(pPlayer);
 	}
 
 	if (!RelicRush_IsCarrier(pPlayer))

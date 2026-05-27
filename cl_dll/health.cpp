@@ -24,6 +24,7 @@
 #include "hud.h"
 #include "cl_util.h"
 #include "parsemsg.h"
+#include "relicrush_overlay.h"
 #include <string.h>
 
 
@@ -32,6 +33,7 @@ DECLARE_MESSAGE(m_Health, Damage)
 DECLARE_MESSAGE(m_Health, RelicCarr)
 DECLARE_MESSAGE(m_Health, RelicSyn)
 DECLARE_MESSAGE(m_Health, RelicGoo)
+DECLARE_MESSAGE(m_Health, RelicBlnd)
 
 bool g_bRelicCarrierHUD = false;
 bool g_bRelicWallCling = false;
@@ -65,6 +67,7 @@ bool CHudHealth::Init()
 	HOOK_MESSAGE(RelicCarr);
 	HOOK_MESSAGE(RelicSyn);
 	HOOK_MESSAGE(RelicGoo);
+	HOOK_MESSAGE(RelicBlnd);
 	m_iHealth = 100;
 	m_fFade = 0;
 	m_iFlags = 0;
@@ -86,6 +89,7 @@ void CHudHealth::Reset()
 	g_bRelicWallCling = false;
 	g_iRelicCarrierGlowAlpha = 0;
 	g_iRelicGooCooldownPct = 0;
+	RelicRush_ResetGooBlindOverlay();
 
 	// make sure the pain compass is cleared when the player respawns
 	m_fAttackFront = m_fAttackRear = m_fAttackRight = m_fAttackLeft = 0;
@@ -152,6 +156,13 @@ bool CHudHealth::MsgFunc_RelicGoo(const char* pszName, int iSize, void* pbuf)
 	g_iRelicGooCooldownPct = READ_BYTE();
 	if (g_iRelicGooCooldownPct < 0) g_iRelicGooCooldownPct = 0;
 	if (g_iRelicGooCooldownPct > 100) g_iRelicGooCooldownPct = 100;
+	return true;
+}
+
+bool CHudHealth::MsgFunc_RelicBlnd(const char* pszName, int iSize, void* pbuf)
+{
+	(void)pszName;
+	RelicRush_OnGooBlindMessage(iSize, pbuf);
 	return true;
 }
 

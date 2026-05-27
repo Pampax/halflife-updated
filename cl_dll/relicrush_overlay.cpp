@@ -1,13 +1,191 @@
 /***
  * Black Mesa Relic Rush - halo vert peripherique + teinte verdatre (porteur)
+ * + voile poison goo (grosses taches vertes pleines)
  ***/
 #include "hud.h"
 #include "cl_util.h"
+#include "parsemsg.h"
 #include "relicrush_overlay.h"
+#include <math.h>
 
 extern bool g_bRelicCarrierHUD;
 extern int g_iRelicCarrierGlowAlpha;
 extern int g_iRelicGooCooldownPct;
+
+// --- Voile poison goo (taches vertes opaques, pas de ScreenFade plein ecran) ---
+
+#define RELIC_GOO_BLIND_BLOBS_MAX 24
+#define RELIC_GOO_BLIND_MIN_PX 3
+
+struct RelicGooBlindBlob
+{
+	float cx, cy; // centre normalise 0..1
+	float rx, ry; // demi-axes normalises
+};
+
+// Gabarit des taches (rayons normalises) ; rr_goo_blind_blob_scale les redimensionne.
+static const RelicGooBlindBlob kRelicGooBlindBlobs[RELIC_GOO_BLIND_BLOBS_MAX] =
+{
+	{0.12f, 0.10f, 0.07f, 0.06f},
+	{0.38f, 0.06f, 0.08f, 0.06f},
+	{0.72f, 0.14f, 0.07f, 0.06f},
+	{0.90f, 0.32f, 0.06f, 0.07f},
+	{0.06f, 0.42f, 0.07f, 0.07f},
+	{0.30f, 0.38f, 0.08f, 0.08f},
+	{0.58f, 0.48f, 0.09f, 0.08f},
+	{0.82f, 0.55f, 0.07f, 0.07f},
+	{0.18f, 0.68f, 0.08f, 0.06f},
+	{0.48f, 0.72f, 0.09f, 0.07f},
+	{0.74f, 0.78f, 0.07f, 0.06f},
+	{0.04f, 0.82f, 0.06f, 0.05f},
+	{0.92f, 0.88f, 0.07f, 0.05f},
+	{0.50f, 0.22f, 0.09f, 0.08f},
+	{0.22f, 0.52f, 0.06f, 0.05f},
+	{0.65f, 0.28f, 0.07f, 0.06f},
+	{0.42f, 0.58f, 0.06f, 0.05f},
+	{0.86f, 0.72f, 0.06f, 0.05f},
+	{0.28f, 0.18f, 0.06f, 0.05f},
+	{0.56f, 0.12f, 0.07f, 0.06f},
+	{0.08f, 0.58f, 0.06f, 0.05f},
+	{0.94f, 0.48f, 0.05f, 0.05f},
+	{0.36f, 0.86f, 0.07f, 0.06f},
+	{0.62f, 0.64f, 0.06f, 0.05f},
+};
+
+static bool s_bGooBlindActive = false;
+static float s_flGooBlindStart = 0.0f;
+static float s_flGooBlindFadeIn = 0.3f;
+static float s_flGooBlindHold = 3.0f;
+static float s_flGooBlindFadeOut = 1.0f;
+static int s_iGooBlindPeakAlpha = 255;
+static int s_iGooBlindR = 0;
+static int s_iGooBlindG = 255;
+static int s_iGooBlindB = 0;
+static float s_flGooBlindBlobScale = 0.55f;
+static int s_iGooBlindBlobCount = 18;
+
+static void RelicRush_FillBlobEllipse(int cx, int cy, int rx, int ry, int r, int g, int b, int a)
+{
+	if (a <= 0 || rx <= 0 || ry <= 0)
+		return;
+
+	const float invRy2 = 1.0f / (float)(ry * ry);
+	for (int dy = -ry; dy <= ry; dy++)
+	{
+		const float t = (float)(dy * dy) * invRy2;
+		if (t > 1.0f)
+			continue;
+		const int dx = (int)((float)rx * sqrtf(1.0f - t));
+		if (dx > 0)
+			FillRGBA(cx - dx, cy + dy, dx * 2, 1, r, g, b, a);
+	}
+}
+
+void RelicRush_ResetGooBlindOverlay()
+{
+	s_bGooBlindActive = false;
+	s_flGooBlindStart = 0.0f;
+}
+
+void RelicRush_OnGooBlindMessage(int iSize, void* pbuf)
+{
+	if (iSize < 1)
+		return;
+
+	BEGIN_READ(pbuf, iSize);
+	const int event = READ_BYTE();
+	if (event == 0)
+	{
+		RelicRush_ResetGooBlindOverlay();
+		return;
+	}
+
+	if (iSize < 8)
+		return;
+
+	const int fadeInTenths = READ_BYTE();
+	const int holdSec = READ_BYTE();
+	const int fadeOutTenths = READ_BYTE();
+	s_iGooBlindPeakAlpha = READ_BYTE();
+	s_iGooBlindR = READ_BYTE();
+	s_iGooBlindG = READ_BYTE();
+	s_iGooBlindB = READ_BYTE();
+
+	if (iSize >= 10)
+	{
+		const int scalePct = READ_BYTE();
+		const int blobCount = READ_BYTE();
+		s_flGooBlindBlobScale = V_max(0.15f, scalePct * 0.01f);
+		s_iGooBlindBlobCount = blobCount < 1 ? 1 : (blobCount > RELIC_GOO_BLIND_BLOBS_MAX ? RELIC_GOO_BLIND_BLOBS_MAX : blobCount);
+	}
+	else
+	{
+		s_flGooBlindBlobScale = 0.55f;
+		s_iGooBlindBlobCount = 18;
+	}
+
+	s_flGooBlindFadeIn = V_max(0.05f, fadeInTenths * 0.1f);
+	s_flGooBlindHold = V_max(0.0f, (float)holdSec);
+	s_flGooBlindFadeOut = V_max(0.05f, fadeOutTenths * 0.1f);
+	if (s_iGooBlindPeakAlpha < 1)
+		s_iGooBlindPeakAlpha = 1;
+	if (s_iGooBlindPeakAlpha > 255)
+		s_iGooBlindPeakAlpha = 255;
+
+	s_flGooBlindStart = gEngfuncs.GetClientTime();
+	s_bGooBlindActive = true;
+}
+
+void RelicRush_DrawGooPoisonOverlay(float flTime)
+{
+	if (!s_bGooBlindActive)
+		return;
+	if (0 != gEngfuncs.IsSpectateOnly())
+		return;
+	if ((gHUD.m_iHideHUDDisplay & HIDEHUD_ALL) != 0)
+		return;
+
+	const int w = ScreenWidth;
+	const int h = ScreenHeight;
+	if (w < 64 || h < 48)
+		return;
+
+	const float elapsed = flTime - s_flGooBlindStart;
+	const float total = s_flGooBlindFadeIn + s_flGooBlindHold + s_flGooBlindFadeOut;
+
+	float coverage = 0.0f;
+	if (elapsed < s_flGooBlindFadeIn)
+		coverage = elapsed / s_flGooBlindFadeIn;
+	else if (elapsed < s_flGooBlindFadeIn + s_flGooBlindHold)
+		coverage = 1.0f;
+	else if (elapsed < total)
+		coverage = 1.0f - (elapsed - s_flGooBlindFadeIn - s_flGooBlindHold) / s_flGooBlindFadeOut;
+	else
+	{
+		RelicRush_ResetGooBlindOverlay();
+		return;
+	}
+
+	int alpha = (int)(s_iGooBlindPeakAlpha * coverage);
+	// Pleine opacité dès que le voile est établi (taches bien pleines, pas voilées).
+	if (coverage >= 1.0f)
+		alpha = s_iGooBlindPeakAlpha;
+	if (alpha <= 0)
+		return;
+
+	const float scale = s_flGooBlindBlobScale;
+	const int nBlobs = s_iGooBlindBlobCount;
+
+	for (int i = 0; i < nBlobs; i++)
+	{
+		const RelicGooBlindBlob& b = kRelicGooBlindBlobs[i];
+		const int cx = (int)(b.cx * (float)w);
+		const int cy = (int)(b.cy * (float)h);
+		const int rx = V_max(RELIC_GOO_BLIND_MIN_PX, (int)(b.rx * (float)w * scale));
+		const int ry = V_max(RELIC_GOO_BLIND_MIN_PX, (int)(b.ry * (float)h * scale));
+		RelicRush_FillBlobEllipse(cx, cy, rx, ry, s_iGooBlindR, s_iGooBlindG, s_iGooBlindB, alpha);
+	}
+}
 
 static void RelicRush_FillVignetteH(int x, int y, int wide, int tall, int r, int g, int b, int alphaNear, int alphaFar)
 {

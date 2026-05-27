@@ -26,6 +26,17 @@ struct RelicRushBalance
 	float soundIntervalMin;
 	float soundIntervalMax;
 	float stealthFadeDuration;
+	// Goo (clic droit porteur) — voile vert victimes
+	float gooAoeRadius;
+	float gooBlindHold;
+	float gooBlindFade;
+	float gooBlindFadeIn;
+	float gooBlindAlpha;
+	float gooBlindR;
+	float gooBlindG;
+	float gooBlindB;
+	float gooBlindBlobScale; // multiplicateur rayon des taches (client)
+	float gooBlindBlobCount; // nombre de taches affichees (1..RELIC_GOO_BLIND_BLOBS_MAX)
 };
 
 extern RelicRushBalance g_RelicBalance;

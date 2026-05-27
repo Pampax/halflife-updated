@@ -11,16 +11,60 @@
 #include "player.h"
 #include "weapons.h"
 #include "decals.h"
-#include "shake.h"
 #include "soundent.h"
 #include "UserMessages.h"
 #include "relicrush_carrier.h"
+#include "relicrush_config.h"
 #include "relicrush_goo.h"
 
 LINK_ENTITY_TO_CLASS(relic_goo, CRelicGooProjectile);
 
-// Vert pur (pas de composante bleue : evite teinte cyan sur beam / fade)
+// Couleur projectile / beam (fixe). Voile victime = rr_goo_blind_* dans relicrush_balance.cfg
 static const Vector kRelicGooColor(0, 255, 0);
+
+static void RelicRush_SendGooBlindClient(CBasePlayer* pPlayer, bool bStart)
+{
+	if (!pPlayer || !pPlayer->IsNetClient())
+		return;
+
+	MESSAGE_BEGIN(MSG_ONE, gmsgRelicBlnd, NULL, pPlayer->edict());
+	WRITE_BYTE(bStart ? 1 : 0);
+	if (bStart)
+	{
+		const int fadeInTenths = (int)(g_RelicBalance.gooBlindFadeIn * 10.0f + 0.5f);
+		const int holdSec = (int)(g_RelicBalance.gooBlindHold + 0.5f);
+		const int fadeOutTenths = (int)(g_RelicBalance.gooBlindFade * 10.0f + 0.5f);
+		WRITE_BYTE(fadeInTenths < 1 ? 1 : (fadeInTenths > 255 ? 255 : fadeInTenths));
+		WRITE_BYTE(holdSec < 0 ? 0 : (holdSec > 255 ? 255 : holdSec));
+		WRITE_BYTE(fadeOutTenths < 1 ? 1 : (fadeOutTenths > 255 ? 255 : fadeOutTenths));
+		WRITE_BYTE((int)g_RelicBalance.gooBlindAlpha);
+		WRITE_BYTE((int)g_RelicBalance.gooBlindR);
+		WRITE_BYTE((int)g_RelicBalance.gooBlindG);
+		WRITE_BYTE((int)g_RelicBalance.gooBlindB);
+		const int scalePct = (int)(g_RelicBalance.gooBlindBlobScale * 100.0f + 0.5f);
+		const int blobCount = (int)(g_RelicBalance.gooBlindBlobCount + 0.5f);
+		WRITE_BYTE(scalePct < 15 ? 15 : (scalePct > 150 ? 150 : scalePct));
+		WRITE_BYTE(blobCount < 1 ? 1 : (blobCount > RELIC_GOO_BLIND_BLOBS_MAX ? RELIC_GOO_BLIND_BLOBS_MAX : blobCount));
+	}
+	else
+	{
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+		WRITE_BYTE(0);
+	}
+	MESSAGE_END();
+}
+
+void RelicRush_ClearGooBlindClient(CBasePlayer* pPlayer)
+{
+	RelicRush_SendGooBlindClient(pPlayer, false);
+}
 
 // Fumee xen verte (sprites additifs : TE_SPRITE, pas TE_SMOKE = carre noir).
 static int g_iRelicGooSmokeSprite[4] = { 0, 0, 0, 0 };
@@ -133,7 +177,7 @@ static int RelicRush_PickGooSmokeSprite()
 }
 
 // Nuage vert xen : TE_SPRITE (additif). TE_SMOKE + xsmoke = carre noir (alphablend requis).
-static void RelicRush_PlayGooExplosionFX(const Vector& vecOrigin, edict_t* pOwner)
+void RelicRush_PlayGooExplosionAt(const Vector& vecOrigin, edict_t* pOwner)
 {
 	for (int i = 0; i < 5; i++)
 	{
@@ -245,7 +289,7 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 	if (pTrace && pTrace->flFraction != 1.0f)
 		pev->origin = pTrace->vecEndPos + (pTrace->vecPlaneNormal * 2.0f);
 
-	RelicRush_PlayGooExplosionFX(pev->origin, pev->owner);
+	RelicRush_PlayGooExplosionAt(pev->origin, pev->owner);
 
 	// Lumiere verte courte
 	MESSAGE_BEGIN(MSG_PAS, SVC_TEMPENTITY, pev->origin);
@@ -269,7 +313,7 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 
 	// Aveuglement AoE : tous les joueurs dans le rayon (proprietaire epargne).
 	CBaseEntity* pEnt = nullptr;
-	while ((pEnt = UTIL_FindEntityInSphere(pEnt, pev->origin, RELIC_GOO_AOE_RADIUS)) != nullptr)
+	while ((pEnt = UTIL_FindEntityInSphere(pEnt, pev->origin, g_RelicBalance.gooAoeRadius)) != nullptr)
 	{
 		if (!pEnt->IsPlayer() || !pEnt->IsAlive())
 			continue;
@@ -391,17 +435,10 @@ void RelicRush_BlindPlayer(CBasePlayer* pVictim)
 	if (!pVictim || !pVictim->IsAlive() || !pVictim->IsNetClient())
 		return;
 
-	pVictim->m_flRelicGooBlindUntil = gpGlobals->time + RELIC_GOO_BLIND_HOLD + RELIC_GOO_BLIND_FADE;
+	pVictim->m_iRelicGooBlindFaded = 0; // permet un nouveau fadeout si re-touch pendant l'effet
+	pVictim->m_flRelicGooBlindUntil = gpGlobals->time + g_RelicBalance.gooBlindHold + g_RelicBalance.gooBlindFade;
 
-	// Etape 1 : montee rapide + maintien (3s). FFADE_IN draine vers la couleur,
-	// FFADE_STAYOUT laisse l'effet jusqu'au prochain ScreenFade.
-	UTIL_ScreenFade(pVictim, kRelicGooColor,
-		0.15f, RELIC_GOO_BLIND_HOLD,
-		RELIC_GOO_BLIND_ALPHA, FFADE_IN | FFADE_STAYOUT);
-
-	// Etape 2 : fadeout 1s programme par think. On utilise pev->dmgtime du joueur
-	// pas dispo -> on stocke dans m_flRelicGooBlindUntil et on declenche le fadeout
-	// dans le tick joueur (RelicRush_TickPlayerBlindFade) appele depuis PlayerThink.
+	RelicRush_SendGooBlindClient(pVictim, true);
 }
 
 void RelicRush_TickPlayerBlindFade(CBasePlayer* pPlayer)
@@ -411,21 +448,31 @@ void RelicRush_TickPlayerBlindFade(CBasePlayer* pPlayer)
 	if (pPlayer->m_flRelicGooBlindUntil <= 0.0f)
 		return;
 
-	const float flFadeStart = pPlayer->m_flRelicGooBlindUntil - RELIC_GOO_BLIND_FADE;
+	const float flFadeStart = pPlayer->m_flRelicGooBlindUntil - g_RelicBalance.gooBlindFade;
 	if (gpGlobals->time >= flFadeStart && pPlayer->m_iRelicGooBlindFaded == 0)
-	{
-		// Declenche un FFADE_OUT (dissipe l'overlay pose par FFADE_STAYOUT).
-		UTIL_ScreenFade(pPlayer, kRelicGooColor,
-			RELIC_GOO_BLIND_FADE, 0.0f,
-			RELIC_GOO_BLIND_ALPHA, FFADE_OUT);
-		pPlayer->m_iRelicGooBlindFaded = 1;
-	}
+		pPlayer->m_iRelicGooBlindFaded = 1; // fadeout gere cote client (RelicBlnd)
 
 	if (gpGlobals->time >= pPlayer->m_flRelicGooBlindUntil)
 	{
 		pPlayer->m_flRelicGooBlindUntil = 0.0f;
 		pPlayer->m_iRelicGooBlindFaded = 0;
 	}
+}
+
+void RelicRush_TestPoisonOnSelf(CBasePlayer* pPlayer)
+{
+	if (!pPlayer || !pPlayer->IsAlive() || !pPlayer->IsNetClient())
+		return;
+	if (RelicRush_IsCarrier(pPlayer))
+	{
+		ClientPrint(pPlayer->pev, HUD_PRINTCONSOLE,
+			"rr_poison : reserve aux joueurs sans la relique (test voile goo).\n");
+		return;
+	}
+
+	RelicRush_PlayGooExplosionAt(pPlayer->pev->origin, pPlayer->edict());
+	RelicRush_BlindPlayer(pPlayer);
+	ClientPrint(pPlayer->pev, HUD_PRINTCENTER, "Test poison goo (debug)");
 }
 
 // -------------------- Trail decals (pister le porteur) --------------------

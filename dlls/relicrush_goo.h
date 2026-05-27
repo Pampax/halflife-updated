@@ -7,10 +7,6 @@ class CBasePlayer;
 
 constexpr float RELIC_GOO_COOLDOWN = 3.0f;
 constexpr float RELIC_GOO_SPEED = 1500.0f;
-constexpr float RELIC_GOO_AOE_RADIUS = 140.0f;
-constexpr float RELIC_GOO_BLIND_HOLD = 3.0f;
-constexpr float RELIC_GOO_BLIND_FADE = 1.0f;
-constexpr int RELIC_GOO_BLIND_ALPHA = 220;
 
 // Trail decals laisses par le porteur (sol/mur/plafond proches)
 constexpr float RELIC_DECAL_MIN = 3.0f;
@@ -27,6 +23,9 @@ constexpr int RELIC_GOO_SPLASH_DECAL_MAX = 26;
 
 // Trainee projectile (TE_BEAMFOLLOW : duree segment = valeur * 0.1 s)
 constexpr int RELIC_GOO_TRAIL_LIFE = 12;
+
+// Voile client (taches vertes) : nombre max envoye par RelicBlnd
+#define RELIC_GOO_BLIND_BLOBS_MAX 24
 
 // Sons (vanilla HL) — impact = eau / liquide uniquement (pas weapons/explode*.wav)
 constexpr const char* RELIC_GOO_FIRE_SOUND = "weapons/glauncher.wav";
@@ -53,8 +52,12 @@ private:
 void RelicRush_PrecacheGooAssets();
 void RelicRush_FireGoo(CBasePlayer* pCarrier);
 void RelicRush_BlindPlayer(CBasePlayer* pVictim);
+void RelicRush_ClearGooBlindClient(CBasePlayer* pPlayer);
+void RelicRush_PlayGooExplosionAt(const Vector& vecOrigin, edict_t* pOwner);
 void RelicRush_TickPlayerBlindFade(CBasePlayer* pPlayer);
 void RelicRush_TickCarrierTrailDecal(CBasePlayer* pCarrier);
 void RelicRush_ResetCarrierGooState(CBasePlayer* pPlayer);
 void RelicRush_SendGooCooldown(CBasePlayer* pPlayer, int iPct);
 void RelicRush_TickCarrierGooSync(CBasePlayer* pPlayer);
+// Debug / test : non-porteur uniquement — voile + FX goo a la position du joueur
+void RelicRush_TestPoisonOnSelf(CBasePlayer* pPlayer);
