@@ -31,10 +31,12 @@ DECLARE_MESSAGE(m_Health, Health)
 DECLARE_MESSAGE(m_Health, Damage)
 DECLARE_MESSAGE(m_Health, RelicCarr)
 DECLARE_MESSAGE(m_Health, RelicSyn)
+DECLARE_MESSAGE(m_Health, RelicGoo)
 
 bool g_bRelicCarrierHUD = false;
 bool g_bRelicWallCling = false;
 int g_iRelicCarrierGlowAlpha = 0;
+int g_iRelicGooCooldownPct = 0; // 0 = vide/inactif, 100 = barre pleine (skill pret)
 
 #define PAIN_NAME "sprites/%d_pain.spr"
 #define DAMAGE_NAME "sprites/%d_dmg.spr"
@@ -62,6 +64,7 @@ bool CHudHealth::Init()
 	HOOK_MESSAGE(Damage);
 	HOOK_MESSAGE(RelicCarr);
 	HOOK_MESSAGE(RelicSyn);
+	HOOK_MESSAGE(RelicGoo);
 	m_iHealth = 100;
 	m_fFade = 0;
 	m_iFlags = 0;
@@ -82,6 +85,7 @@ void CHudHealth::Reset()
 	g_bRelicCarrierHUD = false;
 	g_bRelicWallCling = false;
 	g_iRelicCarrierGlowAlpha = 0;
+	g_iRelicGooCooldownPct = 0;
 
 	// make sure the pain compass is cleared when the player respawns
 	m_fAttackFront = m_fAttackRear = m_fAttackRight = m_fAttackLeft = 0;
@@ -139,6 +143,15 @@ bool CHudHealth::MsgFunc_RelicCarr(const char* pszName, int iSize, void* pbuf)
 		g_iRelicCarrierGlowAlpha = 0;
 	}
 	m_iFlags |= HUD_ACTIVE;
+	return true;
+}
+
+bool CHudHealth::MsgFunc_RelicGoo(const char* pszName, int iSize, void* pbuf)
+{
+	BEGIN_READ(pbuf, iSize);
+	g_iRelicGooCooldownPct = READ_BYTE();
+	if (g_iRelicGooCooldownPct < 0) g_iRelicGooCooldownPct = 0;
+	if (g_iRelicGooCooldownPct > 100) g_iRelicGooCooldownPct = 100;
 	return true;
 }
 

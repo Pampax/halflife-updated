@@ -7,6 +7,7 @@
 
 extern bool g_bRelicCarrierHUD;
 extern int g_iRelicCarrierGlowAlpha;
+extern int g_iRelicGooCooldownPct;
 
 static void RelicRush_FillVignetteH(int x, int y, int wide, int tall, int r, int g, int b, int alphaNear, int alphaFar)
 {
@@ -80,4 +81,59 @@ void RelicRush_DrawCarrierVisionOverlay(float flTime)
 	FillRGBA(w - corner, 0, corner, corner, r, g, b, cornerAlpha);
 	FillRGBA(0, h - corner, corner, corner, r, g, b, cornerAlpha);
 	FillRGBA(w - corner, h - corner, corner, corner, r, g, b, cornerAlpha);
+}
+
+// Barre de charge / cooldown du skill goo (clic droit). Visible uniquement pour le porteur.
+void RelicRush_DrawGooCooldownBar(float flTime)
+{
+	if (!g_bRelicCarrierHUD)
+		return;
+	if (0 != gEngfuncs.IsSpectateOnly())
+		return;
+	if ((gHUD.m_iHideHUDDisplay & HIDEHUD_ALL) != 0)
+		return;
+
+	const int w = ScreenWidth;
+	const int h = ScreenHeight;
+	if (w < 64 || h < 48)
+		return;
+
+	const int barW = V_max(120, w / 4);
+	const int barH = V_max(6, YRES(10));
+	const int barX = (w - barW) / 2;
+	const int barY = h - V_max(40, YRES(56));
+
+	// Fond noir semi-transparent + liseré vert sombre.
+	FillRGBA(barX - 2, barY - 2, barW + 4, barH + 4, 8, 32, 16, 180);
+	FillRGBA(barX, barY, barW, barH, 0, 0, 0, 200);
+
+	const int pct = (g_iRelicGooCooldownPct < 0) ? 0 : ((g_iRelicGooCooldownPct > 100) ? 100 : g_iRelicGooCooldownPct);
+	const int fillW = (barW * pct) / 100;
+
+	// Remplissage vert : sombre tant que ca charge, vif quand pret (100%).
+	int rC, gC, bC, aC;
+	if (pct >= 100)
+	{
+		// Pulsation legere quand pret.
+		const float pulse = 0.85f + 0.15f * (0.5f + 0.5f * sinf(flTime * 6.0f));
+		rC = (int)(48 * pulse);
+		gC = (int)(255 * pulse);
+		bC = (int)(96 * pulse);
+		aC = 235;
+	}
+	else
+	{
+		rC = 32;
+		gC = 200;
+		bC = 72;
+		aC = 220;
+	}
+
+	if (fillW > 0)
+		FillRGBA(barX, barY, fillW, barH, rC, gC, bC, aC);
+
+	// Marque centrale (subdivision visuelle, type "tick"). Optionnel mais lisible.
+	const int tickH = barH / 2;
+	const int tickY = barY + (barH - tickH) / 2;
+	FillRGBA(barX + barW / 2 - 1, tickY, 2, tickH, 8, 64, 24, 120);
 }

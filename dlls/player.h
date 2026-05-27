@@ -226,6 +226,12 @@ public:
 	float m_flNextRelicClientSync = 0.0f;
 	float m_flRelicSuppressWallUntil = 0.0f;
 	int m_iRelicLastSyncGlow = -1;
+	// Goo (clic droit porteur) + trail decals + aveuglement victime
+	float m_flNextRelicGoo = 0.0f;
+	float m_flNextRelicDecal = 0.0f;
+	int m_iRelicGooCooldownPct = -1;
+	float m_flRelicGooBlindUntil = 0.0f;
+	int m_iRelicGooBlindFaded = 0;
 
 	void Spawn() override;
 	void Pain();

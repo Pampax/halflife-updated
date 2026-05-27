@@ -182,6 +182,7 @@ bool CHud::Redraw(float flTime, bool intermission)
 	}
 
 	RelicRush_DrawCarrierVisionOverlay(flTime);
+	RelicRush_DrawGooCooldownBar(flTime);
 
 	/*
 	if ( g_iVisibleMouse )

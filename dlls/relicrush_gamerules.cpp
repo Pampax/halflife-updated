@@ -11,8 +11,10 @@
 #include "skill.h"
 #include "trains.h"
 #include "items.h"
+#include "shake.h"
 #include "relicrush_relic.h"
 #include "relicrush_carrier.h"
+#include "relicrush_goo.h"
 #include "relicrush_gamerules.h"
 #include "relicrush_config.h"
 #include "UserMessages.h"
@@ -45,6 +47,7 @@ CRelicRushMultiplay::CRelicRushMultiplay()
 	PRECACHE_MODEL("models/w_antidote.mdl");
 	PRECACHE_MODEL(RELIC_CARRIER_MONSTER_MODEL);
 	RelicRush_PrecacheModSounds();
+	RelicRush_PrecacheGooAssets();
 }
 
 void CRelicRushMultiplay::ClientUserInfoChanged(CBasePlayer* pPlayer, char* infobuffer)
@@ -301,6 +304,7 @@ void CRelicRushMultiplay::ClearCarrier(CBasePlayer* pPlayer, bool bAnnounce)
 	ApplyCarrierEffects(pPlayer, false);
 	pPlayer->m_bHasRelic = false;
 	RelicRush_FinalizeCarrierLoss(pPlayer);
+	RelicRush_ResetCarrierGooState(pPlayer);
 	pPlayer->UpdateClientData();
 	if (m_pCarrier == pPlayer)
 		m_pCarrier = nullptr;
@@ -396,6 +400,19 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 {
 	CHalfLifeMultiplay::PlayerSpawn(pPlayer);
 
+	// Reset voile vert si la victime respawn pendant l'effet (sinon le ScreenFade
+	// reste pose cote client jusqu'au prochain fade naturel).
+	if (pPlayer && pPlayer->m_flRelicGooBlindUntil > 0.0f)
+	{
+		pPlayer->m_flRelicGooBlindUntil = 0.0f;
+		pPlayer->m_iRelicGooBlindFaded = 0;
+		if (pPlayer->IsNetClient())
+		{
+			static const Vector kClear(0, 0, 0);
+			UTIL_ScreenFade(pPlayer, kClear, 0.1f, 0.0f, 0, FFADE_OUT);
+		}
+	}
+
 	if (!RelicRush_IsCarrier(pPlayer))
 		RelicRush_FinalizeCarrierLoss(pPlayer);
 	else
@@ -423,6 +440,9 @@ void CRelicRushMultiplay::PlayerThink(CBasePlayer* pPlayer)
 
 	if (pPlayer->m_bPendingRelicCarrier)
 		CompleteRelicPickup(pPlayer);
+
+	// Fadeout du voile vert (victimes touchees par la goo) : a calculer pour TOUS les joueurs.
+	RelicRush_TickPlayerBlindFade(pPlayer);
 
 	if (!RelicRush_IsCarrier(pPlayer) || !pPlayer->IsAlive())
 		return;
@@ -480,6 +500,13 @@ void CRelicRushMultiplay::TickCarrier(CBasePlayer* pPlayer)
 		pPlayer->m_flNextRelicClientSync = gpGlobals->time + 0.75f;
 		RelicRush_SyncCarrierClient(pPlayer);
 	}
+
+	// Skill clic droit (front montant uniquement).
+	if ((pPlayer->m_afButtonPressed & IN_ATTACK2) != 0)
+		RelicRush_FireGoo(pPlayer);
+
+	RelicRush_TickCarrierGooSync(pPlayer);
+	RelicRush_TickCarrierTrailDecal(pPlayer);
 }
 bool CRelicRushMultiplay::CanHavePlayerItem(CBasePlayer* pPlayer, CBasePlayerItem* pItem)
 {

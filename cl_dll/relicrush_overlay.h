@@ -4,3 +4,4 @@
 #pragma once
 
 void RelicRush_DrawCarrierVisionOverlay(float flTime);
+void RelicRush_DrawGooCooldownBar(float flTime);
