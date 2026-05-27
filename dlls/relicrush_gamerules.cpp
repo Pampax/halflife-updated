@@ -444,7 +444,7 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 	{
 		pPlayer->m_bRelicHelpShown = true;
 		ClientPrint(pPlayer->pev, HUD_PRINTNOTIFY,
-			"Relic Rush : relique Xen sur la map - regles dans le MOTD a la connexion.");
+			"Relic Rush : MOTD = regles. Porteur : clic gauche=ruee, accroupi=mur, clic droit=goo.");
 		// Fade out + stop de la musique : gere client-side dans HUD_Frame
 		// sur transition GetMaxClients() 0 -> >0 (entree en jeu).
 	}
