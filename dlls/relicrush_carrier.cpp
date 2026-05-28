@@ -396,23 +396,59 @@ static void RelicRush_PlayBroadcastAttackScream(CBasePlayer* pPlayer)
 	UTIL_ScreenShakeExcept(pPlayer->edict(), pPlayer->pev->origin, 5.0f, 45.0f, 0.5f);
 }
 
+static bool RelicRush_GetCarrierStealthFadeT(CBasePlayer* pPlayer, float* outT)
+{
+	if (!outT || !RelicRush_IsCarrier(pPlayer) || !pPlayer->IsAlive())
+		return false;
+
+	const float flNow = gpGlobals->time;
+	const float flVisibleEnd = pPlayer->m_flRelicVisibleUntil;
+	const float flFadeEnd = flVisibleEnd + g_RelicBalance.stealthFadeDuration;
+
+	if (g_RelicBalance.stealthFadeDuration <= 0.0f)
+		return false;
+	if (flNow < flVisibleEnd || flNow >= flFadeEnd)
+		return false;
+
+	*outT = (flNow - flVisibleEnd) / g_RelicBalance.stealthFadeDuration;
+	if (*outT < 0.0f)
+		*outT = 0.0f;
+	else if (*outT > 1.0f)
+		*outT = 1.0f;
+	return true;
+}
+
+// Halo ecran (vignette client) : 0-255, fondu lineaire sur rr_stealth_fade.
 int RelicRush_GetCarrierOverlayGlowAlpha(CBasePlayer* pPlayer)
 {
 	if (!RelicRush_IsCarrier(pPlayer) || !pPlayer->IsAlive())
 		return 0;
 
 	const float flNow = gpGlobals->time;
-	const float flVisibleEnd = pPlayer->m_flRelicVisibleUntil;
-	const float flFadeEnd = flVisibleEnd + g_RelicBalance.stealthFadeDuration;
-
-	if (flNow < flVisibleEnd)
+	if (flNow < pPlayer->m_flRelicVisibleUntil)
 		return 255;
 
-	if (flNow < flFadeEnd && g_RelicBalance.stealthFadeDuration > 0.0f)
-	{
-		const float t = (flNow - flVisibleEnd) / g_RelicBalance.stealthFadeDuration;
-		return (int)(255.0f * (1.0f - t));
-	}
+	float t = 0.0f;
+	if (RelicRush_GetCarrierStealthFadeT(pPlayer, &t))
+		return (int)(255.0f * (1.0f - t) + 0.5f);
+
+	return 0;
+}
+
+// Halo modele 3D (GlowShell) : 0 -> rr_glow_renderamt, meme duree rr_stealth_fade.
+static int RelicRush_GetCarrierModelGlowAlpha(CBasePlayer* pPlayer)
+{
+	if (!RelicRush_IsCarrier(pPlayer) || !pPlayer->IsAlive())
+		return 0;
+
+	const int iPeak = (int)g_RelicBalance.glowRenderAmt;
+	const float flNow = gpGlobals->time;
+	if (flNow < pPlayer->m_flRelicVisibleUntil)
+		return iPeak;
+
+	float t = 0.0f;
+	if (RelicRush_GetCarrierStealthFadeT(pPlayer, &t))
+		return (int)(iPeak * (1.0f - t) + 0.5f);
 
 	return 0;
 }
@@ -423,7 +459,11 @@ void RelicRush_TickCarrierOverlaySync(CBasePlayer* pPlayer)
 		return;
 
 	const int iGlow = RelicRush_GetCarrierOverlayGlowAlpha(pPlayer);
-	if (iGlow == pPlayer->m_iRelicLastSyncGlow)
+	float tFade = 0.0f;
+	const bool bInFade = RelicRush_GetCarrierStealthFadeT(pPlayer, &tFade);
+
+	// Pendant le fondu : sync chaque frame (alpha 0-255). Sinon : seulement si changement.
+	if (!bInFade && iGlow == pPlayer->m_iRelicLastSyncGlow)
 		return;
 
 	pPlayer->m_iRelicLastSyncGlow = iGlow;
@@ -457,21 +497,29 @@ void RelicRush_UpdateCarrierStealth(CBasePlayer* pPlayer)
 		return;
 	}
 
-	if (flNow < flFadeEnd && g_RelicBalance.stealthFadeDuration > 0.0f)
+	float tFade = 0.0f;
+	if (RelicRush_GetCarrierStealthFadeT(pPlayer, &tFade))
 	{
-		const float t = (flNow - flVisibleEnd) / g_RelicBalance.stealthFadeDuration;
-		const float flInv = 1.0f - t;
+		const float flInv = 1.0f - tFade;
+		const int iShellAlpha = RelicRush_GetCarrierModelGlowAlpha(pPlayer);
 
 		pPlayer->pev->skin = RELIC_CARRIER_SKIN;
 		pPlayer->pev->body = 0;
 		pPlayer->pev->rendermode = kRenderTransTexture;
-		pPlayer->pev->renderamt = (int)(iStealthAmt + (iGlowAmt - iStealthAmt) * flInv);
-		pPlayer->pev->rendercolor = kNeutralColor;
 
-		if (t < 0.5f)
+		if (iShellAlpha > 0)
+		{
 			pPlayer->pev->renderfx = kRenderFxGlowShell;
+			pPlayer->pev->rendercolor = glowColor;
+			pPlayer->pev->renderamt = iShellAlpha;
+		}
 		else
+		{
+			// Glow termine : corps en furtivite (rr_stealth_renderamt)
 			pPlayer->pev->renderfx = kRenderFxNone;
+			pPlayer->pev->rendercolor = kNeutralColor;
+			pPlayer->pev->renderamt = iStealthAmt;
+		}
 
 		return;
 	}
@@ -580,16 +628,14 @@ void RelicRush_RefreshCarrierHUD(CBasePlayer* pPlayer, float flHealth)
 	pPlayer->UpdateClientData();
 }
 
-// RelicSyn (3 octets) : flags = porteur(1) | mur(2) | glow 6 bits(4-252 via *4)
-static byte RelicRush_PackSyncFlags(bool bCarrier, bool bWall, int iGlow)
+// RelicSyn (4 octets) : flags | glow 0-255 | health
+static byte RelicRush_PackSyncFlags(bool bCarrier, bool bWall)
 {
 	byte flags = 0;
 	if (bCarrier)
 		flags |= 1;
 	if (bWall)
 		flags |= 2;
-	const int glow6 = V_min(63, (iGlow * 63) / 255);
-	flags |= (byte)((glow6 & 0x3F) << 2);
 	return flags;
 }
 
@@ -611,7 +657,8 @@ void RelicRush_SyncCarrierClient(CBasePlayer* pPlayer)
 	const bool bCarrier = RelicRush_IsCarrier(pPlayer) && pPlayer->IsAlive();
 	const int iHealth = (int)V_max(0.0f, V_min(pPlayer->pev->health, g_RelicBalance.maxHealth));
 	const int iGlow = bCarrier ? RelicRush_GetCarrierOverlayGlowAlpha(pPlayer) : 0;
-	const byte flags = RelicRush_PackSyncFlags(bCarrier, pPlayer->m_bRelicWallClinging, iGlow);
+	const byte flags = RelicRush_PackSyncFlags(bCarrier, pPlayer->m_bRelicWallClinging);
+	const byte glowByte = (byte)V_min(255, V_max(0, iGlow));
 
 	RelicRush_SendCarrierHUD(pPlayer, bCarrier);
 
@@ -622,6 +669,7 @@ void RelicRush_SyncCarrierClient(CBasePlayer* pPlayer)
 
 		MESSAGE_BEGIN(MSG_ONE, gmsgRelicSync, NULL, pPlayer->pev);
 		WRITE_BYTE(flags);
+		WRITE_BYTE(glowByte);
 		WRITE_SHORT(iHealth);
 		MESSAGE_END();
 	}

@@ -170,11 +170,23 @@ bool CHudHealth::MsgFunc_RelicSyn(const char* pszName, int iSize, void* pbuf)
 {
 	BEGIN_READ(pbuf, iSize);
 	const int flags = READ_BYTE();
-	const int health = READ_SHORT();
+	int glow = 0;
+	int health = 0;
+	if (iSize >= 4)
+	{
+		glow = READ_BYTE();
+		health = READ_SHORT();
+	}
+	else if (iSize >= 3)
+	{
+		// Ancien RelicSyn 3 octets (flags + health)
+		health = READ_SHORT();
+		glow = (flags & 1) ? 255 : 0;
+	}
 
 	g_bRelicCarrierHUD = (flags & 1) != 0;
 	g_bRelicWallCling = (flags & 2) != 0;
-	g_iRelicCarrierGlowAlpha = g_bRelicCarrierHUD ? (((flags >> 2) & 0x3F) * 4) : 0;
+	g_iRelicCarrierGlowAlpha = g_bRelicCarrierHUD ? V_min(255, V_max(0, glow)) : 0;
 
 	if (g_bRelicCarrierHUD && health > 0)
 	{

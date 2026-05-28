@@ -67,7 +67,7 @@ void LinkUserMessages()
 
 	gmsgWeapons = REG_USER_MSG("Weapons", 8);
 	gmsgRelicCarrier = REG_USER_MSG("RelicCarr", 1);
-	gmsgRelicSync = REG_USER_MSG("RelicSyn", 3);
+	gmsgRelicSync = REG_USER_MSG("RelicSyn", 4);
 	gmsgRelicPoisn = REG_USER_MSG("RelicPoisn", 1);
 	gmsgRelicPsnVl = REG_USER_MSG("RelicPsnVl", 10);
 
