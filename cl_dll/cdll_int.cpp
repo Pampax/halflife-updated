@@ -206,7 +206,7 @@ static void RelicRush_StartCmd()
 
 	char szCmd[256];
 	_snprintf(szCmd, sizeof(szCmd),
-		"maxplayers 3\n"
+		"maxplayers 8\n"
 		"deathmatch 1\n"
 		"map %s\n",
 		pszMap);
