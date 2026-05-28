@@ -7,6 +7,7 @@
 #include "player.h"
 #include "relicrush_carrier.h"
 #include "relicrush_poison.h"
+#include "weapons.h"
 #include "cdll_dll.h"
 #include "UserMessages.h"
 
@@ -101,9 +102,45 @@ void RelicRush_FinalizeCarrierLoss(CBasePlayer* pPlayer)
 	}
 
 	if (pPlayer->IsAlive())
+	{
 		RelicRush_RestorePlayMode(pPlayer);
+		RelicRush_RestoreNormalCrowbarViewmodel(pPlayer);
+	}
 
 	RelicRush_SyncCarrierClient(pPlayer);
+}
+
+void RelicRush_RestoreNormalCrowbarViewmodel(CBasePlayer* pPlayer)
+{
+	if (!pPlayer || !pPlayer->IsAlive())
+		return;
+
+	CBasePlayerItem* pCrowbar = nullptr;
+	for (int i = 0; i < MAX_ITEM_TYPES; i++)
+	{
+		for (CBasePlayerItem* pItem = pPlayer->m_rgpPlayerItems[i]; pItem; pItem = pItem->m_pNext)
+		{
+			if (pItem->m_iId == WEAPON_CROWBAR)
+			{
+				pCrowbar = pItem;
+				break;
+			}
+		}
+		if (pCrowbar)
+			break;
+	}
+
+	if (!pCrowbar)
+		return;
+
+	pPlayer->pev->viewmodel = iStringNull;
+	pPlayer->pev->weaponmodel = iStringNull;
+
+	CBasePlayerWeapon* pWeapon = static_cast<CBasePlayerWeapon*>(pCrowbar);
+	if (pPlayer->m_pActiveItem != pCrowbar)
+		pPlayer->SwitchWeapon(pCrowbar);
+	else
+		pWeapon->Deploy();
 }
 
 void RelicRush_RestorePlayMode(CBasePlayer* pPlayer)

@@ -37,6 +37,10 @@ constexpr int RELIC_CARRIER_BOTTOMCOLOR = 0;
 // utiliser pulsemachine/etc., on prend un son electrique-portail clairement identifiable).
 constexpr const char* RELIC_AMBIENT_SOUND = "debris/beamstart8.wav";
 constexpr const char* RELIC_CARRIER_PICKUP_SOUND = "items/suitchargeok1.wav";
+// Viewmodels crowbar : seul v_knife est dans relicrush/models/ ; v_crowbar vient de valve (fallback_dir).
+constexpr const char* RELIC_CARRIER_VIEWMODEL = "models/v_knife.mdl";
+constexpr const char* RELIC_NORMAL_CROWBAR_VIEWMODEL = "models/v_crowbar.mdl";
+constexpr const char* RELIC_NORMAL_CROWBAR_WEAPONMODEL = "models/p_crowbar.mdl";
 // v_knife.mdl : sequence "attack3" = CROWBAR_ATTACK3MISS (slash griffes porteur).
 constexpr int RELIC_CARRIER_CLAW_ATTACK_SEQ = 7; // CROWBAR_ATTACK3MISS
 constexpr float RELIC_CARRIER_CLAW_ANIM_FRAMERATE = 2.0f;
@@ -54,6 +58,7 @@ inline bool RelicRush_IsCarrierMoving(CBasePlayer* pPlayer)
 void RelicRush_ResetCarrierVisuals(CBasePlayer* pPlayer);
 void RelicRush_FinalizeCarrierLoss(CBasePlayer* pPlayer);
 void RelicRush_RestorePlayMode(CBasePlayer* pPlayer);
+void RelicRush_RestoreNormalCrowbarViewmodel(CBasePlayer* pPlayer);
 void RelicRush_ApplyCarrierDefaultSkin(CBasePlayer* pPlayer);
 void RelicRush_EnsureCarrierNeutralColors(CBasePlayer* pPlayer);
 void RelicRush_ApplyCarrierModel(CBasePlayer* pPlayer);

@@ -130,10 +130,6 @@ bool CHudHealth::MsgFunc_Health(const char* pszName, int iSize, void* pbuf)
 		m_iHealth = x;
 	}
 
-	// Porteur Relic Rush (250 PV) : afficher la barre meme sans message RelicCarr
-	if (x >= 200)
-		g_bRelicCarrierHUD = true;
-
 	return true;
 }
 

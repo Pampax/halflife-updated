@@ -42,8 +42,8 @@ void CCrowbar::Spawn()
 
 void CCrowbar::Precache()
 {
-	PRECACHE_MODEL("models/v_crowbar.mdl");
-	PRECACHE_MODEL("models/v_knife.mdl");
+	PRECACHE_MODEL(RELIC_NORMAL_CROWBAR_VIEWMODEL);
+	PRECACHE_MODEL(RELIC_CARRIER_VIEWMODEL);
 	PRECACHE_MODEL("models/w_crowbar.mdl");
 	PRECACHE_MODEL("models/p_crowbar.mdl");
 	PRECACHE_SOUND("weapons/cbar_hit1.wav");
@@ -76,16 +76,18 @@ bool CCrowbar::GetItemInfo(ItemInfo* p)
 bool CCrowbar::Deploy()
 {
 #ifndef CLIENT_DLL
-	// Porteur de relique : v_knife.mdl — uniquement sequence attack3 (slash griffes).
-	// Pas de p_*.mdl en 3PP : les autres voient le zombie griffer (PLAYER_ATTACK1).
 	if (m_pPlayer && m_pPlayer->m_bHasRelic)
 	{
-		const bool bOk = DefaultDeploy("models/v_knife.mdl", "", CROWBAR_DRAW, "crowbar");
+		// Griffes porteur (fichier mod) — pas de p_*.mdl : 3PP = animation griffe joueur.
+		const bool bOk = DefaultDeploy(RELIC_CARRIER_VIEWMODEL, "", CROWBAR_DRAW, "crowbar");
 		m_pPlayer->pev->weaponmodel = iStringNull;
 		return bOk;
 	}
+	// Joueur classique : pied-de-biche HL de base (liblist.gam -> fallback_dir valve).
+	return DefaultDeploy(RELIC_NORMAL_CROWBAR_VIEWMODEL, RELIC_NORMAL_CROWBAR_WEAPONMODEL, CROWBAR_DRAW, "crowbar");
+#else
+	return DefaultDeploy(RELIC_NORMAL_CROWBAR_VIEWMODEL, RELIC_NORMAL_CROWBAR_WEAPONMODEL, CROWBAR_DRAW, "crowbar");
 #endif
-	return DefaultDeploy("models/v_crowbar.mdl", "models/p_crowbar.mdl", CROWBAR_DRAW, "crowbar");
 }
 
 void CCrowbar::Holster()

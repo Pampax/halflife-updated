@@ -48,7 +48,7 @@ CRelicRushMultiplay::CRelicRushMultiplay()
 	PRECACHE_MODEL(RELIC_CARRIER_MONSTER_MODEL);
 	// Viewmodel porteur : couteau OpFor (slash melee, meme seq que crowbar). Fichier
 	// relicrush/models/v_knife.mdl — pas besoin d'OpFor installe chez les joueurs.
-	PRECACHE_MODEL("models/v_knife.mdl");
+	PRECACHE_MODEL(RELIC_CARRIER_VIEWMODEL);
 	RelicRush_PrecacheModSounds();
 	RelicRush_PrecachePoisonAssets();
 }
@@ -300,12 +300,8 @@ void CRelicRushMultiplay::SetCarrier(CBasePlayer* pPlayer)
 	pPlayer->m_flNextRelicClientSync = 0.0f;
 	pPlayer->m_bRelicLastSyncWallCling = false;
 
-	// Swap viewmodel couteau : ApplyCarrierLoadout a deploye v_crowbar avant m_bHasRelic.
 	if (pPlayer->m_pActiveItem && pPlayer->m_pActiveItem->m_iId == WEAPON_CROWBAR)
-	{
-		pPlayer->pev->viewmodel = MAKE_STRING("models/v_knife.mdl");
-		pPlayer->pev->weaponmodel = iStringNull;
-	}
+		static_cast<CBasePlayerWeapon*>(pPlayer->m_pActiveItem)->Deploy();
 
 	ClientPrint(pPlayer->pev, HUD_PRINTCENTER, "Vous portez la relique !");
 	EMIT_SOUND_DYN(pPlayer->edict(), CHAN_ITEM, RELIC_CARRIER_PICKUP_SOUND, 1.0f, ATTN_NORM, 0, PITCH_NORM);
@@ -322,8 +318,8 @@ void CRelicRushMultiplay::ClearCarrier(CBasePlayer* pPlayer, bool bAnnounce)
 {
 	if (!pPlayer || !pPlayer->m_bHasRelic)
 		return;
-	ApplyCarrierEffects(pPlayer, false);
 	pPlayer->m_bHasRelic = false;
+	ApplyCarrierEffects(pPlayer, false);
 	RelicRush_FinalizeCarrierLoss(pPlayer);
 	RelicRush_ResetCarrierPoisonState(pPlayer);
 	pPlayer->UpdateClientData();
@@ -435,10 +431,18 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 		}
 	}
 
-	if (!RelicRush_IsCarrier(pPlayer))
+	// Spawn / respawn : tout joueur qui n'est pas le porteur actif de la manche repasse
+	// en mode normal (evite m_bHasRelic residuel -> Deploy v_knife sans relique).
+	if (m_pCarrier != pPlayer)
+	{
+		if (pPlayer->m_bHasRelic)
+		{
+			pPlayer->m_bHasRelic = false;
+			ApplyCarrierEffects(pPlayer, false);
+		}
+		pPlayer->m_bPendingRelicCarrier = false;
 		RelicRush_FinalizeCarrierLoss(pPlayer);
-	else
-		RelicRush_RestorePlayMode(pPlayer);
+	}
 
 	if (!pPlayer->m_bRelicHelpShown)
 	{
@@ -447,18 +451,6 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 			"Relic Rush : MOTD = regles. Porteur : clic gauche=ruee, accroupi=mur, clic droit=poison.");
 		// Fade out + stop de la musique : gere client-side dans HUD_Frame
 		// sur transition GetMaxClients() 0 -> >0 (entree en jeu).
-	}
-	if (RelicRush_IsCarrier(pPlayer))
-	{
-		pPlayer->m_bHasRelic = false;
-		ApplyCarrierLoadout(pPlayer);
-		pPlayer->m_bHasRelic = true;
-		ApplyCarrierEffects(pPlayer, true);
-		if (pPlayer->m_pActiveItem && pPlayer->m_pActiveItem->m_iId == WEAPON_CROWBAR)
-		{
-			pPlayer->pev->viewmodel = MAKE_STRING("models/v_knife.mdl");
-			pPlayer->pev->weaponmodel = iStringNull;
-		}
 	}
 }
 void CRelicRushMultiplay::PlayerThink(CBasePlayer* pPlayer)
