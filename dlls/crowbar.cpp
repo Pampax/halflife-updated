@@ -21,7 +21,7 @@
 #include "player.h"
 #include "gamerules.h"
 #include "relicrush_carrier.h"
-#include "relicrush_goo.h"
+#include "relicrush_poison.h"
 
 
 #define CROWBAR_BODYHIT_VOLUME 128
@@ -272,7 +272,7 @@ bool CCrowbar::Swing(bool fFirst)
 
 		ApplyMultiDamage(m_pPlayer->pev, m_pPlayer->pev);
 
-		// Siphon : soins = degats infliges, uniquement sur joueurs sous effet goo
+		// Siphon : soins = degats infliges, uniquement sur joueurs sous effet poison
 		if (m_pPlayer && m_pPlayer->m_bHasRelic && pEntity && FClassnameIs(pEntity->pev, "player"))
 		{
 			const float flDealt = V_max(0.0f, flVictimHealthBefore - pEntity->pev->health);

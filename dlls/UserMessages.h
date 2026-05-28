@@ -56,7 +56,7 @@ inline int gmsgStatusValue = 0;
 inline int gmsgWeapons = 0;
 inline int gmsgRelicCarrier = 0;
 inline int gmsgRelicSync = 0;
-inline int gmsgRelicGoo = 0;
-inline int gmsgRelicBlnd = 0; // voile goo client (taches vertes)
+inline int gmsgRelicPoisn = 0;
+inline int gmsgRelicPsnVl = 0; // voile poison client (taches vertes)
 
 void LinkUserMessages();

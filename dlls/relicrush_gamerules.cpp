@@ -14,7 +14,7 @@
 #include "shake.h"
 #include "relicrush_relic.h"
 #include "relicrush_carrier.h"
-#include "relicrush_goo.h"
+#include "relicrush_poison.h"
 #include "relicrush_gamerules.h"
 #include "relicrush_config.h"
 #include "UserMessages.h"
@@ -50,7 +50,7 @@ CRelicRushMultiplay::CRelicRushMultiplay()
 	// relicrush/models/v_knife.mdl — pas besoin d'OpFor installe chez les joueurs.
 	PRECACHE_MODEL("models/v_knife.mdl");
 	RelicRush_PrecacheModSounds();
-	RelicRush_PrecacheGooAssets();
+	RelicRush_PrecachePoisonAssets();
 }
 
 void CRelicRushMultiplay::ClientUserInfoChanged(CBasePlayer* pPlayer, char* infobuffer)
@@ -325,7 +325,7 @@ void CRelicRushMultiplay::ClearCarrier(CBasePlayer* pPlayer, bool bAnnounce)
 	ApplyCarrierEffects(pPlayer, false);
 	pPlayer->m_bHasRelic = false;
 	RelicRush_FinalizeCarrierLoss(pPlayer);
-	RelicRush_ResetCarrierGooState(pPlayer);
+	RelicRush_ResetCarrierPoisonState(pPlayer);
 	pPlayer->UpdateClientData();
 	if (m_pCarrier == pPlayer)
 		m_pCarrier = nullptr;
@@ -423,15 +423,15 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 
 	// Reset voile vert si la victime respawn pendant l'effet (sinon le ScreenFade
 	// reste pose cote client jusqu'au prochain fade naturel).
-	if (pPlayer && (pPlayer->m_flRelicGooBlindUntil > 0.0f || pPlayer->m_bRelicGooVictimGlow))
+	if (pPlayer && (pPlayer->m_flRelicPoisonUntil > 0.0f || pPlayer->m_bRelicPoisonVictimGlow))
 	{
 		if (pPlayer->IsNetClient())
-			RelicRush_ClearGooBlindClient(pPlayer);
+			RelicRush_ClearPoisonVeilClient(pPlayer);
 		else
 		{
-			pPlayer->m_flRelicGooBlindUntil = 0.0f;
-			pPlayer->m_iRelicGooBlindFaded = 0;
-			RelicRush_ClearGooVictimGlow(pPlayer);
+			pPlayer->m_flRelicPoisonUntil = 0.0f;
+			pPlayer->m_iRelicPoisonVeilFaded = 0;
+			RelicRush_ClearPoisonVictimGlow(pPlayer);
 		}
 	}
 
@@ -444,7 +444,7 @@ void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 	{
 		pPlayer->m_bRelicHelpShown = true;
 		ClientPrint(pPlayer->pev, HUD_PRINTNOTIFY,
-			"Relic Rush : MOTD = regles. Porteur : clic gauche=ruee, accroupi=mur, clic droit=goo.");
+			"Relic Rush : MOTD = regles. Porteur : clic gauche=ruee, accroupi=mur, clic droit=poison.");
 		// Fade out + stop de la musique : gere client-side dans HUD_Frame
 		// sur transition GetMaxClients() 0 -> >0 (entree en jeu).
 	}
@@ -468,8 +468,8 @@ void CRelicRushMultiplay::PlayerThink(CBasePlayer* pPlayer)
 	if (pPlayer->m_bPendingRelicCarrier)
 		CompleteRelicPickup(pPlayer);
 
-	// Fadeout du voile vert (victimes touchees par la goo) : a calculer pour TOUS les joueurs.
-	RelicRush_TickGooVictimEffects(pPlayer);
+	// Fadeout du voile vert (victimes touchees par le poison) : a calculer pour TOUS les joueurs.
+	RelicRush_TickPoisonVictimEffects(pPlayer);
 
 	if (!RelicRush_IsCarrier(pPlayer) || !pPlayer->IsAlive())
 		return;
@@ -536,9 +536,9 @@ void CRelicRushMultiplay::TickCarrier(CBasePlayer* pPlayer)
 
 	// Skill clic droit (front montant uniquement).
 	if ((pPlayer->m_afButtonPressed & IN_ATTACK2) != 0)
-		RelicRush_FireGoo(pPlayer);
+		RelicRush_FirePoison(pPlayer);
 
-	RelicRush_TickCarrierGooSync(pPlayer);
+	RelicRush_TickCarrierPoisonSync(pPlayer);
 	RelicRush_TickCarrierTrailDecal(pPlayer);
 }
 bool CRelicRushMultiplay::CanHavePlayerItem(CBasePlayer* pPlayer, CBasePlayerItem* pItem)

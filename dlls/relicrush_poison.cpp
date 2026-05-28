@@ -15,36 +15,36 @@
 #include "UserMessages.h"
 #include "relicrush_carrier.h"
 #include "relicrush_config.h"
-#include "relicrush_goo.h"
+#include "relicrush_poison.h"
 
-LINK_ENTITY_TO_CLASS(relic_goo, CRelicGooProjectile);
+LINK_ENTITY_TO_CLASS(relic_poison, CRelicPoisonProjectile);
 
-// Couleur projectile / beam (fixe). Voile victime = rr_goo_blind_* dans relicrush_balance.cfg
-static const Vector kRelicGooColor(0, 255, 0);
+// Couleur projectile / beam (fixe). Voile victime = rr_poison_veil_* dans relicrush_balance.cfg
+static const Vector kRelicPoisonColor(0, 255, 0);
 
-static void RelicRush_SendGooBlindClient(CBasePlayer* pPlayer, bool bStart)
+static void RelicRush_SendPoisonVeilClient(CBasePlayer* pPlayer, bool bStart)
 {
 	if (!pPlayer || !pPlayer->IsNetClient())
 		return;
 
-	MESSAGE_BEGIN(MSG_ONE, gmsgRelicBlnd, NULL, pPlayer->edict());
+	MESSAGE_BEGIN(MSG_ONE, gmsgRelicPsnVl, NULL, pPlayer->edict());
 	WRITE_BYTE(bStart ? 1 : 0);
 	if (bStart)
 	{
-		const int fadeInTenths = (int)(g_RelicBalance.gooBlindFadeIn * 10.0f + 0.5f);
-		const int holdSec = (int)(g_RelicBalance.gooBlindHold + 0.5f);
-		const int fadeOutTenths = (int)(g_RelicBalance.gooBlindFade * 10.0f + 0.5f);
+		const int fadeInTenths = (int)(g_RelicBalance.poisonVeilFadeIn * 10.0f + 0.5f);
+		const int holdSec = (int)(g_RelicBalance.poisonVeilHold + 0.5f);
+		const int fadeOutTenths = (int)(g_RelicBalance.poisonVeilFade * 10.0f + 0.5f);
 		WRITE_BYTE(fadeInTenths < 1 ? 1 : (fadeInTenths > 255 ? 255 : fadeInTenths));
 		WRITE_BYTE(holdSec < 0 ? 0 : (holdSec > 255 ? 255 : holdSec));
 		WRITE_BYTE(fadeOutTenths < 1 ? 1 : (fadeOutTenths > 255 ? 255 : fadeOutTenths));
-		WRITE_BYTE((int)g_RelicBalance.gooBlindAlpha);
-		WRITE_BYTE((int)g_RelicBalance.gooBlindR);
-		WRITE_BYTE((int)g_RelicBalance.gooBlindG);
-		WRITE_BYTE((int)g_RelicBalance.gooBlindB);
-		const int scalePct = (int)(g_RelicBalance.gooBlindBlobScale * 100.0f + 0.5f);
-		const int blobCount = (int)(g_RelicBalance.gooBlindBlobCount + 0.5f);
+		WRITE_BYTE((int)g_RelicBalance.poisonVeilAlpha);
+		WRITE_BYTE((int)g_RelicBalance.poisonVeilR);
+		WRITE_BYTE((int)g_RelicBalance.poisonVeilG);
+		WRITE_BYTE((int)g_RelicBalance.poisonVeilB);
+		const int scalePct = (int)(g_RelicBalance.poisonVeilBlobScale * 100.0f + 0.5f);
+		const int blobCount = (int)(g_RelicBalance.poisonVeilBlobCount + 0.5f);
 		WRITE_BYTE(scalePct < 15 ? 15 : (scalePct > 150 ? 150 : scalePct));
-		WRITE_BYTE(blobCount < 1 ? 1 : (blobCount > RELIC_GOO_BLIND_BLOBS_MAX ? RELIC_GOO_BLIND_BLOBS_MAX : blobCount));
+		WRITE_BYTE(blobCount < 1 ? 1 : (blobCount > RELIC_POISON_VEIL_BLOBS_MAX ? RELIC_POISON_VEIL_BLOBS_MAX : blobCount));
 	}
 	else
 	{
@@ -61,34 +61,34 @@ static void RelicRush_SendGooBlindClient(CBasePlayer* pPlayer, bool bStart)
 	MESSAGE_END();
 }
 
-void RelicRush_ClearGooBlindClient(CBasePlayer* pPlayer)
+void RelicRush_ClearPoisonVeilClient(CBasePlayer* pPlayer)
 {
 	if (!pPlayer)
 		return;
-	RelicRush_SendGooBlindClient(pPlayer, false);
-	pPlayer->m_flRelicGooBlindUntil = 0.0f;
-	pPlayer->m_iRelicGooBlindFaded = 0;
-	RelicRush_ClearGooVictimGlow(pPlayer);
+	RelicRush_SendPoisonVeilClient(pPlayer, false);
+	pPlayer->m_flRelicPoisonUntil = 0.0f;
+	pPlayer->m_iRelicPoisonVeilFaded = 0;
+	RelicRush_ClearPoisonVictimGlow(pPlayer);
 }
 
-bool RelicRush_IsPlayerGooAffected(CBasePlayer* pPlayer)
+bool RelicRush_IsPlayerPoisoned(CBasePlayer* pPlayer)
 {
 	if (!pPlayer || !pPlayer->IsAlive())
 		return false;
-	return pPlayer->m_flRelicGooBlindUntil > gpGlobals->time;
+	return pPlayer->m_flRelicPoisonUntil > gpGlobals->time;
 }
 
-static float RelicRush_GetGooBlindTotalDuration()
+static float RelicRush_GetPoisonVeilTotalDuration()
 {
-	return g_RelicBalance.gooBlindFadeIn + g_RelicBalance.gooBlindHold + g_RelicBalance.gooBlindFade;
+	return g_RelicBalance.poisonVeilFadeIn + g_RelicBalance.poisonVeilHold + g_RelicBalance.poisonVeilFade;
 }
 
-void RelicRush_ClearGooVictimGlow(CBasePlayer* pPlayer)
+void RelicRush_ClearPoisonVictimGlow(CBasePlayer* pPlayer)
 {
-	if (!pPlayer || !pPlayer->m_bRelicGooVictimGlow)
+	if (!pPlayer || !pPlayer->m_bRelicPoisonVictimGlow)
 		return;
 
-	pPlayer->m_bRelicGooVictimGlow = false;
+	pPlayer->m_bRelicPoisonVictimGlow = false;
 
 	// Le porteur a son propre rendu furtif ; TickCarrier le restaurera.
 	if (RelicRush_IsCarrier(pPlayer))
@@ -100,43 +100,43 @@ void RelicRush_ClearGooVictimGlow(CBasePlayer* pPlayer)
 	pPlayer->pev->rendercolor = Vector(255, 255, 255);
 }
 
-static void RelicRush_ApplyGooVictimGlow(CBasePlayer* pPlayer)
+static void RelicRush_ApplyPoisonVictimGlow(CBasePlayer* pPlayer)
 {
 	if (!pPlayer || !pPlayer->IsAlive() || RelicRush_IsCarrier(pPlayer))
 		return;
 
-	pPlayer->m_bRelicGooVictimGlow = true;
+	pPlayer->m_bRelicPoisonVictimGlow = true;
 	pPlayer->pev->rendermode = kRenderNormal;
 	pPlayer->pev->renderfx = kRenderFxGlowShell;
-	pPlayer->pev->renderamt = (int)g_RelicBalance.gooVictimGlowAmt;
-	pPlayer->pev->rendercolor = Vector(g_RelicBalance.gooBlindR, g_RelicBalance.gooBlindG, g_RelicBalance.gooBlindB);
+	pPlayer->pev->renderamt = (int)g_RelicBalance.poisonVictimGlowAmt;
+	pPlayer->pev->rendercolor = Vector(g_RelicBalance.poisonVeilR, g_RelicBalance.poisonVeilG, g_RelicBalance.poisonVeilB);
 }
 
 // Fumee xen verte (sprites additifs : TE_SPRITE, pas TE_SMOKE = carre noir).
-static int g_iRelicGooSmokeSprite[4] = { 0, 0, 0, 0 };
+static int g_iRelicPoisonSmokeSprite[4] = { 0, 0, 0, 0 };
 
-static int RelicRush_PickGooDecal()
+static int RelicRush_PickPoisonDecal()
 {
 	return (RANDOM_LONG(0, 1) == 0) ? DECAL_SPIT1 : DECAL_SPIT2;
 }
 
 // Pose un decal vert si le trace touche une surface BSP.
-static void RelicRush_TryGooDecalTrace(const Vector& vecStart, const Vector& vecEnd, edict_t* pSkip)
+static void RelicRush_TryPoisonDecalTrace(const Vector& vecStart, const Vector& vecEnd, edict_t* pSkip)
 {
 	TraceResult tr;
 	UTIL_TraceLine(vecStart, vecEnd, ignore_monsters, pSkip, &tr);
 	if (tr.flFraction < 1.0f)
-		UTIL_DecalTrace(&tr, RelicRush_PickGooDecal());
+		UTIL_DecalTrace(&tr, RelicRush_PickPoisonDecal());
 }
 
 // Eclaboussures vertes reparties dans une sphere autour de l'impact (sol, murs, plafond).
-static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCenterHit, edict_t* pSkip)
+static void RelicRush_SplashPoisonDecals(const Vector& vecOrigin, TraceResult* pCenterHit, edict_t* pSkip)
 {
-	const float flRadius = RELIC_GOO_SPLASH_DECAL_RADIUS;
+	const float flRadius = RELIC_POISON_SPLASH_DECAL_RADIUS;
 
 	if (pCenterHit && pCenterHit->flFraction < 1.0f)
 	{
-		UTIL_DecalTrace(pCenterHit, RelicRush_PickGooDecal());
+		UTIL_DecalTrace(pCenterHit, RelicRush_PickPoisonDecal());
 
 		const Vector wallN = pCenterHit->vecPlaneNormal;
 		Vector right, up;
@@ -161,11 +161,11 @@ static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCen
 				+ right * RANDOM_FLOAT(-flRadius * 0.85f, flRadius * 0.85f)
 				+ up * RANDOM_FLOAT(-flRadius * 0.85f, flRadius * 0.85f)
 				+ wallN * 4.0f;
-			RelicRush_TryGooDecalTrace(vecOff, vecOff - wallN * 32.0f, pSkip);
+			RelicRush_TryPoisonDecalTrace(vecOff, vecOff - wallN * 32.0f, pSkip);
 		}
 	}
 
-	const int nSplats = RANDOM_LONG(RELIC_GOO_SPLASH_DECAL_MIN, RELIC_GOO_SPLASH_DECAL_MAX);
+	const int nSplats = RANDOM_LONG(RELIC_POISON_SPLASH_DECAL_MIN, RELIC_POISON_SPLASH_DECAL_MAX);
 
 	for (int i = 0; i < nSplats; i++)
 	{
@@ -180,7 +180,7 @@ static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCen
 		dir = dir * (RANDOM_FLOAT(flRadius * 0.15f, flRadius) / flLen);
 
 		const Vector vecProbe = vecOrigin + dir;
-		RelicRush_TryGooDecalTrace(vecProbe, vecProbe - dir * 28.0f, pSkip);
+		RelicRush_TryPoisonDecalTrace(vecProbe, vecProbe - dir * 28.0f, pSkip);
 	}
 
 	// Anneaux supplementaires (sol + murs)
@@ -192,8 +192,8 @@ static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCen
 		{
 			const float ang = (6.2831853f * r) / nRingPts;
 			const Vector vecProbe = vecOrigin + Vector(cosf(ang) * flRing, sinf(ang) * flRing, RANDOM_FLOAT(-12.0f, 18.0f));
-			RelicRush_TryGooDecalTrace(vecProbe, vecProbe - Vector(0, 0, 48.0f), pSkip);
-			RelicRush_TryGooDecalTrace(vecProbe, vecProbe + Vector(cosf(ang), sinf(ang), 0) * 32.0f, pSkip);
+			RelicRush_TryPoisonDecalTrace(vecProbe, vecProbe - Vector(0, 0, 48.0f), pSkip);
+			RelicRush_TryPoisonDecalTrace(vecProbe, vecProbe + Vector(cosf(ang), sinf(ang), 0) * 32.0f, pSkip);
 		}
 	}
 
@@ -204,18 +204,18 @@ static void RelicRush_SplashGooDecals(const Vector& vecOrigin, TraceResult* pCen
 			RANDOM_FLOAT(-flRadius * 0.95f, flRadius * 0.95f),
 			RANDOM_FLOAT(-flRadius * 0.95f, flRadius * 0.95f),
 			12.0f);
-		RelicRush_TryGooDecalTrace(vecFloorStart, vecFloorStart - Vector(0, 0, 96.0f), pSkip);
+		RelicRush_TryPoisonDecalTrace(vecFloorStart, vecFloorStart - Vector(0, 0, 96.0f), pSkip);
 	}
 }
 
-static int RelicRush_PickGooSmokeSprite()
+static int RelicRush_PickPoisonSmokeSprite()
 {
 	int pool[4];
 	int n = 0;
 	for (int j = 0; j < 4; j++)
 	{
-		if (g_iRelicGooSmokeSprite[j] > 0)
-			pool[n++] = g_iRelicGooSmokeSprite[j];
+		if (g_iRelicPoisonSmokeSprite[j] > 0)
+			pool[n++] = g_iRelicPoisonSmokeSprite[j];
 	}
 	if (n > 0)
 		return pool[RANDOM_LONG(0, n - 1)];
@@ -223,11 +223,11 @@ static int RelicRush_PickGooSmokeSprite()
 }
 
 // Nuage vert xen : TE_SPRITE (additif). TE_SMOKE + xsmoke = carre noir (alphablend requis).
-void RelicRush_PlayGooExplosionAt(const Vector& vecOrigin, edict_t* pOwner)
+void RelicRush_PlayPoisonExplosionAt(const Vector& vecOrigin, edict_t* pOwner)
 {
 	for (int i = 0; i < 5; i++)
 	{
-		const int iSprite = RelicRush_PickGooSmokeSprite();
+		const int iSprite = RelicRush_PickPoisonSmokeSprite();
 		if (iSprite <= 0)
 			continue;
 
@@ -251,24 +251,24 @@ void RelicRush_PlayGooExplosionAt(const Vector& vecOrigin, edict_t* pOwner)
 
 	static const char* kSlosh[] =
 	{
-		RELIC_GOO_IMPACT_SOUND_1,
-		RELIC_GOO_IMPACT_SOUND_2,
-		RELIC_GOO_IMPACT_SOUND_3,
-		RELIC_GOO_IMPACT_SOUND_4,
+		RELIC_POISON_IMPACT_SOUND_1,
+		RELIC_POISON_IMPACT_SOUND_2,
+		RELIC_POISON_IMPACT_SOUND_3,
+		RELIC_POISON_IMPACT_SOUND_4,
 	};
 	const char* pszSlosh = kSlosh[RANDOM_LONG(0, ARRAYSIZE(kSlosh) - 1)];
 
 	edict_t* pEmit = (!FNullEnt(pOwner)) ? pOwner : INDEXENT(0);
 	UTIL_EmitAmbientSound(pEmit, vecOrigin, pszSlosh, 1.0f, ATTN_NORM, 0, RANDOM_LONG(95, 108));
-	UTIL_EmitAmbientSound(pEmit, vecOrigin, RELIC_GOO_IMPACT_SOUND_DEEP, 0.85f, ATTN_NORM, 0, RANDOM_LONG(88, 102));
+	UTIL_EmitAmbientSound(pEmit, vecOrigin, RELIC_POISON_IMPACT_SOUND_DEEP, 0.85f, ATTN_NORM, 0, RANDOM_LONG(88, 102));
 }
 
-void CRelicGooProjectile::Spawn()
+void CRelicPoisonProjectile::Spawn()
 {
 	pev->movetype = MOVETYPE_FLY;
 	pev->solid = SOLID_BBOX;
 	pev->gravity = 0.0f;
-	pev->classname = MAKE_STRING("relic_goo");
+	pev->classname = MAKE_STRING("relic_poison");
 
 	SET_MODEL(ENT(pev), "models/grenade.mdl");
 	UTIL_SetSize(pev, Vector(-2, -2, -2), Vector(2, 2, 2));
@@ -277,22 +277,22 @@ void CRelicGooProjectile::Spawn()
 	// Projectile vert lumineux (glow fort, mesh discret)
 	pev->rendermode = kRenderTransAdd;
 	pev->renderfx = kRenderFxGlowShell;
-	pev->rendercolor = kRelicGooColor;
+	pev->rendercolor = kRelicPoisonColor;
 	pev->renderamt = 220;
 	pev->effects |= EF_BRIGHTLIGHT;
 	pev->scale = 0.45f;
 
 	StartGreenTrail();
 
-	SetTouch(&CRelicGooProjectile::GooTouch);
-	SetThink(&CRelicGooProjectile::GooFlyThink);
+	SetTouch(&CRelicPoisonProjectile::PoisonTouch);
+	SetThink(&CRelicPoisonProjectile::PoisonFlyThink);
 	pev->nextthink = gpGlobals->time + 0.05f;
 
 	// Auto-detruit apres 4s si rien touche
 	pev->dmgtime = gpGlobals->time + 4.0f;
 }
 
-void CRelicGooProjectile::StartGreenTrail()
+void CRelicPoisonProjectile::StartGreenTrail()
 {
 	// g_sModelIndexLaser : precache map (weapons.cpp), jamais PRECACHE_MODEL en jeu.
 	if (g_sModelIndexLaser <= 0)
@@ -302,16 +302,16 @@ void CRelicGooProjectile::StartGreenTrail()
 	WRITE_BYTE(TE_BEAMFOLLOW);
 	WRITE_SHORT(entindex());
 	WRITE_SHORT(g_sModelIndexLaser);
-	WRITE_BYTE(RELIC_GOO_TRAIL_LIFE);	// duree (*0.1s, ex. 40 = 4 s)
+	WRITE_BYTE(RELIC_POISON_TRAIL_LIFE);	// duree (*0.1s, ex. 40 = 4 s)
 	WRITE_BYTE(4);						// largeur
-	WRITE_BYTE((int)kRelicGooColor.x);	// r, g, b
-	WRITE_BYTE((int)kRelicGooColor.y);
-	WRITE_BYTE((int)kRelicGooColor.z);
+	WRITE_BYTE((int)kRelicPoisonColor.x);	// r, g, b
+	WRITE_BYTE((int)kRelicPoisonColor.y);
+	WRITE_BYTE((int)kRelicPoisonColor.z);
 	WRITE_BYTE(140);					// luminosite (trainee semi-transparente)
 	MESSAGE_END();
 }
 
-void CRelicGooProjectile::GooFlyThink()
+void CRelicPoisonProjectile::PoisonFlyThink()
 {
 	if (gpGlobals->time >= pev->dmgtime)
 	{
@@ -324,7 +324,7 @@ void CRelicGooProjectile::GooFlyThink()
 	pev->nextthink = gpGlobals->time + 0.05f;
 }
 
-void CRelicGooProjectile::Explode(TraceResult* pTrace)
+void CRelicPoisonProjectile::Explode(TraceResult* pTrace)
 {
 	pev->model = iStringNull;
 	pev->solid = SOLID_NOT;
@@ -335,7 +335,7 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 	if (pTrace && pTrace->flFraction != 1.0f)
 		pev->origin = pTrace->vecEndPos + (pTrace->vecPlaneNormal * 2.0f);
 
-	RelicRush_PlayGooExplosionAt(pev->origin, pev->owner);
+	RelicRush_PlayPoisonExplosionAt(pev->origin, pev->owner);
 
 	// Lumiere verte courte
 	MESSAGE_BEGIN(MSG_PAS, SVC_TEMPENTITY, pev->origin);
@@ -344,9 +344,9 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 	WRITE_COORD(pev->origin.y);
 	WRITE_COORD(pev->origin.z);
 	WRITE_BYTE(24);
-	WRITE_BYTE((int)kRelicGooColor.x);
-	WRITE_BYTE((int)kRelicGooColor.y);
-	WRITE_BYTE((int)kRelicGooColor.z);
+	WRITE_BYTE((int)kRelicPoisonColor.x);
+	WRITE_BYTE((int)kRelicPoisonColor.y);
+	WRITE_BYTE((int)kRelicPoisonColor.z);
 	WRITE_BYTE(6);
 	WRITE_BYTE(90);
 	MESSAGE_END();
@@ -355,11 +355,11 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 		pev->origin - Vector(48, 48, 24),
 		pev->origin + Vector(48, 48, 48),
 		RANDOM_LONG(8, 14));
-	RelicRush_SplashGooDecals(pev->origin, pTrace, ENT(pev));
+	RelicRush_SplashPoisonDecals(pev->origin, pTrace, ENT(pev));
 
 	// Aveuglement AoE : tous les joueurs dans le rayon (proprietaire epargne).
 	CBaseEntity* pEnt = nullptr;
-	while ((pEnt = UTIL_FindEntityInSphere(pEnt, pev->origin, g_RelicBalance.gooAoeRadius)) != nullptr)
+	while ((pEnt = UTIL_FindEntityInSphere(pEnt, pev->origin, g_RelicBalance.poisonAoeRadius)) != nullptr)
 	{
 		if (!pEnt->IsPlayer() || !pEnt->IsAlive())
 			continue;
@@ -378,7 +378,7 @@ void CRelicGooProjectile::Explode(TraceResult* pTrace)
 	UTIL_Remove(this);
 }
 
-void CRelicGooProjectile::GooTouch(CBaseEntity* pOther)
+void CRelicPoisonProjectile::PoisonTouch(CBaseEntity* pOther)
 {
 	// Si on touche le proprietaire au tout debut, ignorer.
 	if (pOther && pOther->edict() == pev->owner)
@@ -417,39 +417,39 @@ void CRelicGooProjectile::GooTouch(CBaseEntity* pOther)
 	Explode(&tr);
 }
 
-CRelicGooProjectile* CRelicGooProjectile::Shoot(CBasePlayer* pOwner, Vector vecOrigin, Vector vecAimDir)
+CRelicPoisonProjectile* CRelicPoisonProjectile::Shoot(CBasePlayer* pOwner, Vector vecOrigin, Vector vecAimDir)
 {
-	CRelicGooProjectile* pGoo = GetClassPtr((CRelicGooProjectile*)nullptr);
-	UTIL_SetOrigin(pGoo->pev, vecOrigin);
-	pGoo->pev->angles = UTIL_VecToAngles(vecAimDir);
-	pGoo->Spawn();
-	pGoo->pev->velocity = vecAimDir * RELIC_GOO_SPEED;
-	pGoo->pev->owner = pOwner->edict();
-	return pGoo;
+	CRelicPoisonProjectile* pPoison = GetClassPtr((CRelicPoisonProjectile*)nullptr);
+	UTIL_SetOrigin(pPoison->pev, vecOrigin);
+	pPoison->pev->angles = UTIL_VecToAngles(vecAimDir);
+	pPoison->Spawn();
+	pPoison->pev->velocity = vecAimDir * RELIC_POISON_SPEED;
+	pPoison->pev->owner = pOwner->edict();
+	return pPoison;
 }
 
 // -------------------- Tir cote porteur --------------------
 
-void RelicRush_PrecacheGooAssets()
+void RelicRush_PrecachePoisonAssets()
 {
 	PRECACHE_MODEL("models/grenade.mdl");
-	g_iRelicGooSmokeSprite[0] = PRECACHE_MODEL("sprites/xsmoke1.spr");
-	g_iRelicGooSmokeSprite[1] = PRECACHE_MODEL("sprites/xsmoke3.spr");
-	g_iRelicGooSmokeSprite[2] = PRECACHE_MODEL("sprites/xsmoke4.spr");
-	g_iRelicGooSmokeSprite[3] = PRECACHE_MODEL("sprites/xssmke1.spr");
-	PRECACHE_SOUND(RELIC_GOO_FIRE_SOUND);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_1);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_2);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_3);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_4);
-	PRECACHE_SOUND(RELIC_GOO_IMPACT_SOUND_DEEP);
+	g_iRelicPoisonSmokeSprite[0] = PRECACHE_MODEL("sprites/xsmoke1.spr");
+	g_iRelicPoisonSmokeSprite[1] = PRECACHE_MODEL("sprites/xsmoke3.spr");
+	g_iRelicPoisonSmokeSprite[2] = PRECACHE_MODEL("sprites/xsmoke4.spr");
+	g_iRelicPoisonSmokeSprite[3] = PRECACHE_MODEL("sprites/xssmke1.spr");
+	PRECACHE_SOUND(RELIC_POISON_FIRE_SOUND);
+	PRECACHE_SOUND(RELIC_POISON_IMPACT_SOUND_1);
+	PRECACHE_SOUND(RELIC_POISON_IMPACT_SOUND_2);
+	PRECACHE_SOUND(RELIC_POISON_IMPACT_SOUND_3);
+	PRECACHE_SOUND(RELIC_POISON_IMPACT_SOUND_4);
+	PRECACHE_SOUND(RELIC_POISON_IMPACT_SOUND_DEEP);
 }
 
-void RelicRush_FireGoo(CBasePlayer* pCarrier)
+void RelicRush_FirePoison(CBasePlayer* pCarrier)
 {
 	if (!RelicRush_IsCarrier(pCarrier) || !pCarrier->IsAlive())
 		return;
-	if (gpGlobals->time < pCarrier->m_flNextRelicGoo)
+	if (gpGlobals->time < pCarrier->m_flNextRelicPoison)
 		return;
 
 	UTIL_MakeVectors(pCarrier->pev->v_angle);
@@ -462,13 +462,13 @@ void RelicRush_FireGoo(CBasePlayer* pCarrier)
 	// Spawn devant les yeux du porteur.
 	const Vector vecMuzzle = pCarrier->GetGunPosition() + vecAim * 14.0f;
 
-	CRelicGooProjectile::Shoot(pCarrier, vecMuzzle, vecAim);
+	CRelicPoisonProjectile::Shoot(pCarrier, vecMuzzle, vecAim);
 
 	// Son du tir (entendu globalement, ATTN_NORM pour proximite naturelle).
-	EMIT_SOUND_DYN(pCarrier->edict(), CHAN_WEAPON, RELIC_GOO_FIRE_SOUND, 0.9f, ATTN_NORM, 0, 110);
+	EMIT_SOUND_DYN(pCarrier->edict(), CHAN_WEAPON, RELIC_POISON_FIRE_SOUND, 0.9f, ATTN_NORM, 0, 110);
 
-	pCarrier->m_flNextRelicGoo = gpGlobals->time + RELIC_GOO_COOLDOWN;
-	pCarrier->m_iRelicGooCooldownPct = -1; // force prochaine emission
+	pCarrier->m_flNextRelicPoison = gpGlobals->time + RELIC_POISON_COOLDOWN;
+	pCarrier->m_iRelicPoisonCooldownPct = -1; // force prochaine emission
 
 	// Petit shake du porteur (effet de recul).
 	UTIL_ScreenShake(pCarrier->pev->origin, 2.0f, 80.0f, 0.2f, 80.0f);
@@ -481,36 +481,36 @@ void RelicRush_BlindPlayer(CBasePlayer* pVictim)
 	if (!pVictim || !pVictim->IsAlive() || !pVictim->IsNetClient())
 		return;
 
-	pVictim->m_iRelicGooBlindFaded = 0; // permet un nouveau fadeout si re-touch pendant l'effet
-	pVictim->m_flRelicGooBlindUntil = gpGlobals->time + RelicRush_GetGooBlindTotalDuration();
+	pVictim->m_iRelicPoisonVeilFaded = 0; // permet un nouveau fadeout si re-touch pendant l'effet
+	pVictim->m_flRelicPoisonUntil = gpGlobals->time + RelicRush_GetPoisonVeilTotalDuration();
 
-	RelicRush_SendGooBlindClient(pVictim, true);
-	RelicRush_ApplyGooVictimGlow(pVictim);
+	RelicRush_SendPoisonVeilClient(pVictim, true);
+	RelicRush_ApplyPoisonVictimGlow(pVictim);
 }
 
-void RelicRush_TickGooVictimEffects(CBasePlayer* pPlayer)
+void RelicRush_TickPoisonVictimEffects(CBasePlayer* pPlayer)
 {
 	if (!pPlayer)
 		return;
 
-	if (RelicRush_IsPlayerGooAffected(pPlayer))
+	if (RelicRush_IsPlayerPoisoned(pPlayer))
 	{
 		if (pPlayer->IsNetClient())
 		{
-			const float flFadeStart = pPlayer->m_flRelicGooBlindUntil - g_RelicBalance.gooBlindFade;
-			if (gpGlobals->time >= flFadeStart && pPlayer->m_iRelicGooBlindFaded == 0)
-				pPlayer->m_iRelicGooBlindFaded = 1; // fadeout gere cote client (RelicBlnd)
+			const float flFadeStart = pPlayer->m_flRelicPoisonUntil - g_RelicBalance.poisonVeilFade;
+			if (gpGlobals->time >= flFadeStart && pPlayer->m_iRelicPoisonVeilFaded == 0)
+				pPlayer->m_iRelicPoisonVeilFaded = 1; // fadeout gere cote client (RelicPsnVl)
 		}
 
-		RelicRush_ApplyGooVictimGlow(pPlayer);
+		RelicRush_ApplyPoisonVictimGlow(pPlayer);
 		return;
 	}
 
-	if (pPlayer->m_flRelicGooBlindUntil > 0.0f || pPlayer->m_bRelicGooVictimGlow)
+	if (pPlayer->m_flRelicPoisonUntil > 0.0f || pPlayer->m_bRelicPoisonVictimGlow)
 	{
-		pPlayer->m_flRelicGooBlindUntil = 0.0f;
-		pPlayer->m_iRelicGooBlindFaded = 0;
-		RelicRush_ClearGooVictimGlow(pPlayer);
+		pPlayer->m_flRelicPoisonUntil = 0.0f;
+		pPlayer->m_iRelicPoisonVeilFaded = 0;
+		RelicRush_ClearPoisonVictimGlow(pPlayer);
 	}
 }
 
@@ -521,13 +521,13 @@ void RelicRush_TestPoisonOnSelf(CBasePlayer* pPlayer)
 	if (RelicRush_IsCarrier(pPlayer))
 	{
 		ClientPrint(pPlayer->pev, HUD_PRINTCONSOLE,
-			"rr_poison : reserve aux joueurs sans la relique (test voile goo).\n");
+			"rr_poison : reserve aux joueurs sans la relique (test voile poison).\n");
 		return;
 	}
 
-	RelicRush_PlayGooExplosionAt(pPlayer->pev->origin, pPlayer->edict());
+	RelicRush_PlayPoisonExplosionAt(pPlayer->pev->origin, pPlayer->edict());
 	RelicRush_BlindPlayer(pPlayer);
-	ClientPrint(pPlayer->pev, HUD_PRINTCENTER, "Test poison goo (debug)");
+	ClientPrint(pPlayer->pev, HUD_PRINTCENTER, "Test poison (debug)");
 }
 
 // -------------------- Trail decals (pister le porteur) --------------------
@@ -624,46 +624,46 @@ void RelicRush_TickCarrierTrailDecal(CBasePlayer* pCarrier)
 
 // -------------------- Sync cooldown -> client HUD --------------------
 
-void RelicRush_SendGooCooldown(CBasePlayer* pPlayer, int iPct)
+void RelicRush_SendPoisonCooldown(CBasePlayer* pPlayer, int iPct)
 {
-	if (gmsgRelicGoo <= 0 || !pPlayer || !pPlayer->IsNetClient())
+	if (gmsgRelicPoisn <= 0 || !pPlayer || !pPlayer->IsNetClient())
 		return;
 
 	if (iPct < 0) iPct = 0;
 	if (iPct > 100) iPct = 100;
 
-	MESSAGE_BEGIN(MSG_ONE, gmsgRelicGoo, NULL, pPlayer->pev);
+	MESSAGE_BEGIN(MSG_ONE, gmsgRelicPoisn, NULL, pPlayer->pev);
 	WRITE_BYTE((byte)iPct);
 	MESSAGE_END();
 
-	pPlayer->m_iRelicGooCooldownPct = iPct;
+	pPlayer->m_iRelicPoisonCooldownPct = iPct;
 }
 
-void RelicRush_TickCarrierGooSync(CBasePlayer* pPlayer)
+void RelicRush_TickCarrierPoisonSync(CBasePlayer* pPlayer)
 {
 	if (!pPlayer)
 		return;
 
 	int iPct;
-	const float flRemain = pPlayer->m_flNextRelicGoo - gpGlobals->time;
+	const float flRemain = pPlayer->m_flNextRelicPoison - gpGlobals->time;
 	if (flRemain <= 0.0f)
 		iPct = 100; // pret
 	else
-		iPct = (int)(100.0f * (1.0f - (flRemain / RELIC_GOO_COOLDOWN)));
+		iPct = (int)(100.0f * (1.0f - (flRemain / RELIC_POISON_COOLDOWN)));
 
 	// Seulement si changement notable (eviter le spam reseau).
-	const int iPrev = pPlayer->m_iRelicGooCooldownPct;
+	const int iPrev = pPlayer->m_iRelicPoisonCooldownPct;
 	if (iPrev < 0 || abs(iPct - iPrev) >= 4 || (iPct == 100 && iPrev != 100))
-		RelicRush_SendGooCooldown(pPlayer, iPct);
+		RelicRush_SendPoisonCooldown(pPlayer, iPct);
 }
 
-void RelicRush_ResetCarrierGooState(CBasePlayer* pPlayer)
+void RelicRush_ResetCarrierPoisonState(CBasePlayer* pPlayer)
 {
 	if (!pPlayer)
 		return;
-	pPlayer->m_flNextRelicGoo = 0.0f;
+	pPlayer->m_flNextRelicPoison = 0.0f;
 	pPlayer->m_flNextRelicDecal = 0.0f;
-	if (pPlayer->m_iRelicGooCooldownPct != 0 && pPlayer->IsNetClient())
-		RelicRush_SendGooCooldown(pPlayer, 0); // efface la barre cote client
-	pPlayer->m_iRelicGooCooldownPct = -1;
+	if (pPlayer->m_iRelicPoisonCooldownPct != 0 && pPlayer->IsNetClient())
+		RelicRush_SendPoisonCooldown(pPlayer, 0); // efface la barre cote client
+	pPlayer->m_iRelicPoisonCooldownPct = -1;
 }

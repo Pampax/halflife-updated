@@ -6,7 +6,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "relicrush_carrier.h"
-#include "relicrush_goo.h"
+#include "relicrush_poison.h"
 #include "cdll_dll.h"
 #include "UserMessages.h"
 
@@ -435,7 +435,8 @@ void RelicRush_UpdateCarrierStealth(CBasePlayer* pPlayer)
 	if (!RelicRush_IsCarrier(pPlayer) || !pPlayer->IsAlive())
 		return;
 
-	RelicRush_RefreshBalance();
+	// Equilibrage : RelicRush_RefreshBalance() au chargement map + rr_reload_balance
+	// (pas ici : spam console si une cvar hors limites).
 
 	const float flNow = gpGlobals->time;
 	const float flVisibleEnd = pPlayer->m_flRelicVisibleUntil;
@@ -799,10 +800,10 @@ void RelicRush_PrecacheModSounds()
 
 void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, CBasePlayer* pVictim, float flDamageDealt)
 {
-	// Siphon : porteur actif, victime sous effet goo uniquement (pendant le voile)
+	// Siphon : porteur actif, victime sous effet poison uniquement (pendant le voile)
 	if (!pCarrier || !pVictim || !pCarrier->m_bHasRelic || !pCarrier->IsAlive() || flDamageDealt <= 0.0f)
 		return;
-	if (!RelicRush_IsPlayerGooAffected(pVictim))
+	if (!RelicRush_IsPlayerPoisoned(pVictim))
 		return;
 
 	pCarrier->m_bRelicAllowHeal = true;

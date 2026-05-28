@@ -1,6 +1,6 @@
 /***
  * Black Mesa Relic Rush - halo vert peripherique + teinte verdatre (porteur)
- * + voile poison goo (grosses taches vertes pleines)
+ * + voile poison poison (grosses taches vertes pleines)
  ***/
 #include "hud.h"
 #include "cl_util.h"
@@ -10,21 +10,21 @@
 
 extern bool g_bRelicCarrierHUD;
 extern int g_iRelicCarrierGlowAlpha;
-extern int g_iRelicGooCooldownPct;
+extern int g_iRelicPoisonCooldownPct;
 
-// --- Voile poison goo (taches vertes opaques, pas de ScreenFade plein ecran) ---
+// --- Voile poison poison (taches vertes opaques, pas de ScreenFade plein ecran) ---
 
-#define RELIC_GOO_BLIND_BLOBS_MAX 24
-#define RELIC_GOO_BLIND_MIN_PX 3
+#define RELIC_POISON_VEIL_BLOBS_MAX 24
+#define RELIC_POISON_VEIL_MIN_PX 3
 
-struct RelicGooBlindBlob
+struct RelicPoisonVeilBlob
 {
 	float cx, cy; // centre normalise 0..1
 	float rx, ry; // demi-axes normalises
 };
 
-// Gabarit des taches (rayons normalises) ; rr_goo_blind_blob_scale les redimensionne.
-static const RelicGooBlindBlob kRelicGooBlindBlobs[RELIC_GOO_BLIND_BLOBS_MAX] =
+// Gabarit des taches (rayons normalises) ; rr_poison_veil_blob_scale les redimensionne.
+static const RelicPoisonVeilBlob kRelicPoisonVeilBlobs[RELIC_POISON_VEIL_BLOBS_MAX] =
 {
 	{0.12f, 0.10f, 0.07f, 0.06f},
 	{0.38f, 0.06f, 0.08f, 0.06f},
@@ -52,17 +52,17 @@ static const RelicGooBlindBlob kRelicGooBlindBlobs[RELIC_GOO_BLIND_BLOBS_MAX] =
 	{0.62f, 0.64f, 0.06f, 0.05f},
 };
 
-static bool s_bGooBlindActive = false;
-static float s_flGooBlindStart = 0.0f;
-static float s_flGooBlindFadeIn = 0.3f;
-static float s_flGooBlindHold = 3.0f;
-static float s_flGooBlindFadeOut = 1.0f;
-static int s_iGooBlindPeakAlpha = 255;
-static int s_iGooBlindR = 0;
-static int s_iGooBlindG = 255;
-static int s_iGooBlindB = 0;
-static float s_flGooBlindBlobScale = 0.55f;
-static int s_iGooBlindBlobCount = 18;
+static bool s_bPoisonVeilActive = false;
+static float s_flPoisonVeilStart = 0.0f;
+static float s_flPoisonVeilFadeIn = 0.3f;
+static float s_flPoisonVeilHold = 3.0f;
+static float s_flPoisonVeilFadeOut = 1.0f;
+static int s_iPoisonVeilPeakAlpha = 255;
+static int s_iPoisonVeilR = 0;
+static int s_iPoisonVeilG = 255;
+static int s_iPoisonVeilB = 0;
+static float s_flPoisonVeilBlobScale = 0.55f;
+static int s_iPoisonVeilBlobCount = 18;
 
 static void RelicRush_FillBlobEllipse(int cx, int cy, int rx, int ry, int r, int g, int b, int a)
 {
@@ -81,13 +81,13 @@ static void RelicRush_FillBlobEllipse(int cx, int cy, int rx, int ry, int r, int
 	}
 }
 
-void RelicRush_ResetGooBlindOverlay()
+void RelicRush_ResetPoisonVeilOverlay()
 {
-	s_bGooBlindActive = false;
-	s_flGooBlindStart = 0.0f;
+	s_bPoisonVeilActive = false;
+	s_flPoisonVeilStart = 0.0f;
 }
 
-void RelicRush_OnGooBlindMessage(int iSize, void* pbuf)
+void RelicRush_OnPoisonVeilMessage(int iSize, void* pbuf)
 {
 	if (iSize < 1)
 		return;
@@ -96,7 +96,7 @@ void RelicRush_OnGooBlindMessage(int iSize, void* pbuf)
 	const int event = READ_BYTE();
 	if (event == 0)
 	{
-		RelicRush_ResetGooBlindOverlay();
+		RelicRush_ResetPoisonVeilOverlay();
 		return;
 	}
 
@@ -106,39 +106,39 @@ void RelicRush_OnGooBlindMessage(int iSize, void* pbuf)
 	const int fadeInTenths = READ_BYTE();
 	const int holdSec = READ_BYTE();
 	const int fadeOutTenths = READ_BYTE();
-	s_iGooBlindPeakAlpha = READ_BYTE();
-	s_iGooBlindR = READ_BYTE();
-	s_iGooBlindG = READ_BYTE();
-	s_iGooBlindB = READ_BYTE();
+	s_iPoisonVeilPeakAlpha = READ_BYTE();
+	s_iPoisonVeilR = READ_BYTE();
+	s_iPoisonVeilG = READ_BYTE();
+	s_iPoisonVeilB = READ_BYTE();
 
 	if (iSize >= 10)
 	{
 		const int scalePct = READ_BYTE();
 		const int blobCount = READ_BYTE();
-		s_flGooBlindBlobScale = V_max(0.15f, scalePct * 0.01f);
-		s_iGooBlindBlobCount = blobCount < 1 ? 1 : (blobCount > RELIC_GOO_BLIND_BLOBS_MAX ? RELIC_GOO_BLIND_BLOBS_MAX : blobCount);
+		s_flPoisonVeilBlobScale = V_max(0.15f, scalePct * 0.01f);
+		s_iPoisonVeilBlobCount = blobCount < 1 ? 1 : (blobCount > RELIC_POISON_VEIL_BLOBS_MAX ? RELIC_POISON_VEIL_BLOBS_MAX : blobCount);
 	}
 	else
 	{
-		s_flGooBlindBlobScale = 0.55f;
-		s_iGooBlindBlobCount = 18;
+		s_flPoisonVeilBlobScale = 0.55f;
+		s_iPoisonVeilBlobCount = 18;
 	}
 
-	s_flGooBlindFadeIn = V_max(0.05f, fadeInTenths * 0.1f);
-	s_flGooBlindHold = V_max(0.0f, (float)holdSec);
-	s_flGooBlindFadeOut = V_max(0.05f, fadeOutTenths * 0.1f);
-	if (s_iGooBlindPeakAlpha < 1)
-		s_iGooBlindPeakAlpha = 1;
-	if (s_iGooBlindPeakAlpha > 255)
-		s_iGooBlindPeakAlpha = 255;
+	s_flPoisonVeilFadeIn = V_max(0.05f, fadeInTenths * 0.1f);
+	s_flPoisonVeilHold = V_max(0.0f, (float)holdSec);
+	s_flPoisonVeilFadeOut = V_max(0.05f, fadeOutTenths * 0.1f);
+	if (s_iPoisonVeilPeakAlpha < 1)
+		s_iPoisonVeilPeakAlpha = 1;
+	if (s_iPoisonVeilPeakAlpha > 255)
+		s_iPoisonVeilPeakAlpha = 255;
 
-	s_flGooBlindStart = gEngfuncs.GetClientTime();
-	s_bGooBlindActive = true;
+	s_flPoisonVeilStart = gEngfuncs.GetClientTime();
+	s_bPoisonVeilActive = true;
 }
 
-void RelicRush_DrawGooPoisonOverlay(float flTime)
+void RelicRush_DrawPoisonVeilOverlay(float flTime)
 {
-	if (!s_bGooBlindActive)
+	if (!s_bPoisonVeilActive)
 		return;
 	if (0 != gEngfuncs.IsSpectateOnly())
 		return;
@@ -150,40 +150,40 @@ void RelicRush_DrawGooPoisonOverlay(float flTime)
 	if (w < 64 || h < 48)
 		return;
 
-	const float elapsed = flTime - s_flGooBlindStart;
-	const float total = s_flGooBlindFadeIn + s_flGooBlindHold + s_flGooBlindFadeOut;
+	const float elapsed = flTime - s_flPoisonVeilStart;
+	const float total = s_flPoisonVeilFadeIn + s_flPoisonVeilHold + s_flPoisonVeilFadeOut;
 
 	float coverage = 0.0f;
-	if (elapsed < s_flGooBlindFadeIn)
-		coverage = elapsed / s_flGooBlindFadeIn;
-	else if (elapsed < s_flGooBlindFadeIn + s_flGooBlindHold)
+	if (elapsed < s_flPoisonVeilFadeIn)
+		coverage = elapsed / s_flPoisonVeilFadeIn;
+	else if (elapsed < s_flPoisonVeilFadeIn + s_flPoisonVeilHold)
 		coverage = 1.0f;
 	else if (elapsed < total)
-		coverage = 1.0f - (elapsed - s_flGooBlindFadeIn - s_flGooBlindHold) / s_flGooBlindFadeOut;
+		coverage = 1.0f - (elapsed - s_flPoisonVeilFadeIn - s_flPoisonVeilHold) / s_flPoisonVeilFadeOut;
 	else
 	{
-		RelicRush_ResetGooBlindOverlay();
+		RelicRush_ResetPoisonVeilOverlay();
 		return;
 	}
 
-	int alpha = (int)(s_iGooBlindPeakAlpha * coverage);
+	int alpha = (int)(s_iPoisonVeilPeakAlpha * coverage);
 	// Pleine opacité dès que le voile est établi (taches bien pleines, pas voilées).
 	if (coverage >= 1.0f)
-		alpha = s_iGooBlindPeakAlpha;
+		alpha = s_iPoisonVeilPeakAlpha;
 	if (alpha <= 0)
 		return;
 
-	const float scale = s_flGooBlindBlobScale;
-	const int nBlobs = s_iGooBlindBlobCount;
+	const float scale = s_flPoisonVeilBlobScale;
+	const int nBlobs = s_iPoisonVeilBlobCount;
 
 	for (int i = 0; i < nBlobs; i++)
 	{
-		const RelicGooBlindBlob& b = kRelicGooBlindBlobs[i];
+		const RelicPoisonVeilBlob& b = kRelicPoisonVeilBlobs[i];
 		const int cx = (int)(b.cx * (float)w);
 		const int cy = (int)(b.cy * (float)h);
-		const int rx = V_max(RELIC_GOO_BLIND_MIN_PX, (int)(b.rx * (float)w * scale));
-		const int ry = V_max(RELIC_GOO_BLIND_MIN_PX, (int)(b.ry * (float)h * scale));
-		RelicRush_FillBlobEllipse(cx, cy, rx, ry, s_iGooBlindR, s_iGooBlindG, s_iGooBlindB, alpha);
+		const int rx = V_max(RELIC_POISON_VEIL_MIN_PX, (int)(b.rx * (float)w * scale));
+		const int ry = V_max(RELIC_POISON_VEIL_MIN_PX, (int)(b.ry * (float)h * scale));
+		RelicRush_FillBlobEllipse(cx, cy, rx, ry, s_iPoisonVeilR, s_iPoisonVeilG, s_iPoisonVeilB, alpha);
 	}
 }
 
@@ -261,8 +261,8 @@ void RelicRush_DrawCarrierVisionOverlay(float flTime)
 	FillRGBA(w - corner, h - corner, corner, corner, r, g, b, cornerAlpha);
 }
 
-// Barre de charge / cooldown du skill goo (clic droit). Visible uniquement pour le porteur.
-void RelicRush_DrawGooCooldownBar(float flTime)
+// Barre de charge / cooldown du skill poison (clic droit). Visible uniquement pour le porteur.
+void RelicRush_DrawPoisonCooldownBar(float flTime)
 {
 	if (!g_bRelicCarrierHUD)
 		return;
@@ -285,7 +285,7 @@ void RelicRush_DrawGooCooldownBar(float flTime)
 	FillRGBA(barX - 2, barY - 2, barW + 4, barH + 4, 0, 48, 0, 180);
 	FillRGBA(barX, barY, barW, barH, 0, 0, 0, 200);
 
-	const int pct = (g_iRelicGooCooldownPct < 0) ? 0 : ((g_iRelicGooCooldownPct > 100) ? 100 : g_iRelicGooCooldownPct);
+	const int pct = (g_iRelicPoisonCooldownPct < 0) ? 0 : ((g_iRelicPoisonCooldownPct > 100) ? 100 : g_iRelicPoisonCooldownPct);
 	const int fillW = (barW * pct) / 100;
 
 	// Remplissage vert : sombre tant que ca charge, vif quand pret (100%).

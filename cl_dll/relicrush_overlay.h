@@ -4,11 +4,11 @@
 #pragma once
 
 void RelicRush_DrawCarrierVisionOverlay(float flTime);
-void RelicRush_DrawGooCooldownBar(float flTime);
+void RelicRush_DrawPoisonCooldownBar(float flTime);
 void RelicRush_DrawCarrierCrosshair(float flTime);
 void RelicRush_ApplyCarrierCrosshair(bool bOnTarget);
 
-// Voile poison goo : grosses taches vertes (message RelicBlnd)
-void RelicRush_OnGooBlindMessage(int iSize, void* pbuf);
-void RelicRush_DrawGooPoisonOverlay(float flTime);
-void RelicRush_ResetGooBlindOverlay();
+// Voile poison : grosses taches vertes (message RelicPsnVl)
+void RelicRush_OnPoisonVeilMessage(int iSize, void* pbuf);
+void RelicRush_DrawPoisonVeilOverlay(float flTime);
+void RelicRush_ResetPoisonVeilOverlay();

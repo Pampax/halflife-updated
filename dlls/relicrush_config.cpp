@@ -36,35 +36,82 @@ static cvar_t rr_visible_time = {"rr_visible_time", "3", FCVAR_SERVER};
 static cvar_t rr_sound_min = {"rr_sound_min", "3", FCVAR_SERVER};
 static cvar_t rr_sound_max = {"rr_sound_max", "10", FCVAR_SERVER};
 static cvar_t rr_stealth_fade = {"rr_stealth_fade", "1", FCVAR_SERVER};
-static cvar_t rr_goo_aoe_radius = {"rr_goo_aoe_radius", "140", FCVAR_SERVER};
-static cvar_t rr_goo_blind_hold = {"rr_goo_blind_hold", "3", FCVAR_SERVER};
-static cvar_t rr_goo_blind_fade = {"rr_goo_blind_fade", "1", FCVAR_SERVER};
-static cvar_t rr_goo_blind_fadein = {"rr_goo_blind_fadein", "0.15", FCVAR_SERVER};
-static cvar_t rr_goo_blind_alpha = {"rr_goo_blind_alpha", "255", FCVAR_SERVER};
-static cvar_t rr_goo_blind_r = {"rr_goo_blind_r", "0", FCVAR_SERVER};
-static cvar_t rr_goo_blind_g = {"rr_goo_blind_g", "255", FCVAR_SERVER};
-static cvar_t rr_goo_blind_b = {"rr_goo_blind_b", "0", FCVAR_SERVER};
-static cvar_t rr_goo_blind_blob_scale = {"rr_goo_blind_blob_scale", "0.45", FCVAR_SERVER};
-static cvar_t rr_goo_blind_blob_count = {"rr_goo_blind_blob_count", "18", FCVAR_SERVER};
-static cvar_t rr_goo_victim_glow_amt = {"rr_goo_victim_glow_amt", "50", FCVAR_SERVER};
+static cvar_t rr_poison_aoe_radius = {"rr_poison_aoe_radius", "140", FCVAR_SERVER};
+static cvar_t rr_poison_veil_hold = {"rr_poison_veil_hold", "3", FCVAR_SERVER};
+static cvar_t rr_poison_veil_fade = {"rr_poison_veil_fade", "1", FCVAR_SERVER};
+static cvar_t rr_poison_veil_fadein = {"rr_poison_veil_fadein", "0.15", FCVAR_SERVER};
+static cvar_t rr_poison_veil_alpha = {"rr_poison_veil_alpha", "255", FCVAR_SERVER};
+static cvar_t rr_poison_veil_r = {"rr_poison_veil_r", "0", FCVAR_SERVER};
+static cvar_t rr_poison_veil_g = {"rr_poison_veil_g", "255", FCVAR_SERVER};
+static cvar_t rr_poison_veil_b = {"rr_poison_veil_b", "0", FCVAR_SERVER};
+static cvar_t rr_poison_veil_blob_scale = {"rr_poison_veil_blob_scale", "0.45", FCVAR_SERVER};
+static cvar_t rr_poison_veil_blob_count = {"rr_poison_veil_blob_count", "18", FCVAR_SERVER};
+static cvar_t rr_poison_victim_glow_amt = {"rr_poison_victim_glow_amt", "50", FCVAR_SERVER};
+
+#define RR_CLAMP_WARN_SLOTS 12
+
+static struct
+{
+	char szName[32];
+} s_rrClampWarned[RR_CLAMP_WARN_SLOTS];
+
+static bool RR_ClampAlreadyWarned(const char* name)
+{
+	for (int i = 0; i < RR_CLAMP_WARN_SLOTS; i++)
+	{
+		if (s_rrClampWarned[i].szName[0] == '\0')
+			return false;
+		if (!stricmp(s_rrClampWarned[i].szName, name))
+			return true;
+	}
+	return false;
+}
+
+static void RR_ClampMarkWarned(const char* name)
+{
+	for (int i = 0; i < RR_CLAMP_WARN_SLOTS; i++)
+	{
+		if (s_rrClampWarned[i].szName[0] == '\0' || !stricmp(s_rrClampWarned[i].szName, name))
+		{
+			strncpy(s_rrClampWarned[i].szName, name, sizeof(s_rrClampWarned[i].szName) - 1);
+			s_rrClampWarned[i].szName[sizeof(s_rrClampWarned[i].szName) - 1] = '\0';
+			return;
+		}
+	}
+}
 
 static float RR_ClampCvar(const char* name, float value, float minVal, float maxVal)
 {
 	if (value < minVal)
 	{
-		ALERT(at_console, "Relic Rush: %s=%g trop bas, clamp %g\n", name, value, minVal);
+		if (!RR_ClampAlreadyWarned(name))
+		{
+			ALERT(at_console, "Relic Rush: %s=%g trop bas, clamp %g\n", name, value, minVal);
+			RR_ClampMarkWarned(name);
+		}
 		return minVal;
 	}
 	if (value > maxVal)
 	{
-		ALERT(at_console, "Relic Rush: %s=%g trop haut, clamp %g\n", name, value, maxVal);
+		if (!RR_ClampAlreadyWarned(name))
+		{
+			ALERT(at_console, "Relic Rush: %s=%g trop haut, clamp %g\n", name, value, maxVal);
+			RR_ClampMarkWarned(name);
+		}
 		return maxVal;
 	}
 	return value;
 }
 
+static void RelicRush_ClearClampWarnings()
+{
+	for (int i = 0; i < RR_CLAMP_WARN_SLOTS; i++)
+		s_rrClampWarned[i].szName[0] = '\0';
+}
+
 static void RelicRush_ReloadBalanceCmd()
 {
+	RelicRush_ClearClampWarnings();
 	RelicRush_RefreshBalance();
 	// Ne pas utiliser UTIL_ClientPrintAll ici : gmsgTextMsg peut etre 0 avant LinkUserMessages.
 	ALERT(at_console, "Relic Rush: equilibrage recharge (cvars -> gameplay).\n");
@@ -95,17 +142,17 @@ void RelicRush_RefreshBalance()
 	if (g_RelicBalance.soundIntervalMax < g_RelicBalance.soundIntervalMin)
 		g_RelicBalance.soundIntervalMax = g_RelicBalance.soundIntervalMin;
 	g_RelicBalance.stealthFadeDuration = RR_ClampCvar("rr_stealth_fade", CVAR_GET_FLOAT("rr_stealth_fade"), 0.0f, 5.0f);
-	g_RelicBalance.gooAoeRadius = RR_ClampCvar("rr_goo_aoe_radius", CVAR_GET_FLOAT("rr_goo_aoe_radius"), 32.0f, 512.0f);
-	g_RelicBalance.gooBlindHold = RR_ClampCvar("rr_goo_blind_hold", CVAR_GET_FLOAT("rr_goo_blind_hold"), 0.0f, 30.0f);
-	g_RelicBalance.gooBlindFade = RR_ClampCvar("rr_goo_blind_fade", CVAR_GET_FLOAT("rr_goo_blind_fade"), 0.0f, 10.0f);
-	g_RelicBalance.gooBlindFadeIn = RR_ClampCvar("rr_goo_blind_fadein", CVAR_GET_FLOAT("rr_goo_blind_fadein"), 0.0f, 3.0f);
-	g_RelicBalance.gooBlindAlpha = RR_ClampCvar("rr_goo_blind_alpha", CVAR_GET_FLOAT("rr_goo_blind_alpha"), 1.0f, 255.0f);
-	g_RelicBalance.gooBlindR = RR_ClampCvar("rr_goo_blind_r", CVAR_GET_FLOAT("rr_goo_blind_r"), 0.0f, 255.0f);
-	g_RelicBalance.gooBlindG = RR_ClampCvar("rr_goo_blind_g", CVAR_GET_FLOAT("rr_goo_blind_g"), 0.0f, 255.0f);
-	g_RelicBalance.gooBlindB = RR_ClampCvar("rr_goo_blind_b", CVAR_GET_FLOAT("rr_goo_blind_b"), 0.0f, 255.0f);
-	g_RelicBalance.gooBlindBlobScale = RR_ClampCvar("rr_goo_blind_blob_scale", CVAR_GET_FLOAT("rr_goo_blind_blob_scale"), 0.15f, 1.5f);
-	g_RelicBalance.gooBlindBlobCount = RR_ClampCvar("rr_goo_blind_blob_count", CVAR_GET_FLOAT("rr_goo_blind_blob_count"), 1.0f, 24.0f);
-	g_RelicBalance.gooVictimGlowAmt = RR_ClampCvar("rr_goo_victim_glow_amt", CVAR_GET_FLOAT("rr_goo_victim_glow_amt"), 1.0f, 255.0f);
+	g_RelicBalance.poisonAoeRadius = RR_ClampCvar("rr_poison_aoe_radius", CVAR_GET_FLOAT("rr_poison_aoe_radius"), 32.0f, 512.0f);
+	g_RelicBalance.poisonVeilHold = RR_ClampCvar("rr_poison_veil_hold", CVAR_GET_FLOAT("rr_poison_veil_hold"), 0.0f, 30.0f);
+	g_RelicBalance.poisonVeilFade = RR_ClampCvar("rr_poison_veil_fade", CVAR_GET_FLOAT("rr_poison_veil_fade"), 0.0f, 10.0f);
+	g_RelicBalance.poisonVeilFadeIn = RR_ClampCvar("rr_poison_veil_fadein", CVAR_GET_FLOAT("rr_poison_veil_fadein"), 0.0f, 3.0f);
+	g_RelicBalance.poisonVeilAlpha = RR_ClampCvar("rr_poison_veil_alpha", CVAR_GET_FLOAT("rr_poison_veil_alpha"), 1.0f, 255.0f);
+	g_RelicBalance.poisonVeilR = RR_ClampCvar("rr_poison_veil_r", CVAR_GET_FLOAT("rr_poison_veil_r"), 0.0f, 255.0f);
+	g_RelicBalance.poisonVeilG = RR_ClampCvar("rr_poison_veil_g", CVAR_GET_FLOAT("rr_poison_veil_g"), 0.0f, 255.0f);
+	g_RelicBalance.poisonVeilB = RR_ClampCvar("rr_poison_veil_b", CVAR_GET_FLOAT("rr_poison_veil_b"), 0.0f, 255.0f);
+	g_RelicBalance.poisonVeilBlobScale = RR_ClampCvar("rr_poison_veil_blob_scale", CVAR_GET_FLOAT("rr_poison_veil_blob_scale"), 0.15f, 1.5f);
+	g_RelicBalance.poisonVeilBlobCount = RR_ClampCvar("rr_poison_veil_blob_count", CVAR_GET_FLOAT("rr_poison_veil_blob_count"), 1.0f, 24.0f);
+	g_RelicBalance.poisonVictimGlowAmt = RR_ClampCvar("rr_poison_victim_glow_amt", CVAR_GET_FLOAT("rr_poison_victim_glow_amt"), 1.0f, 255.0f);
 }
 
 void RelicRush_RegisterBalanceCvars()
@@ -131,17 +178,17 @@ void RelicRush_RegisterBalanceCvars()
 	CVAR_REGISTER(&rr_sound_min);
 	CVAR_REGISTER(&rr_sound_max);
 	CVAR_REGISTER(&rr_stealth_fade);
-	CVAR_REGISTER(&rr_goo_aoe_radius);
-	CVAR_REGISTER(&rr_goo_blind_hold);
-	CVAR_REGISTER(&rr_goo_blind_fade);
-	CVAR_REGISTER(&rr_goo_blind_fadein);
-	CVAR_REGISTER(&rr_goo_blind_alpha);
-	CVAR_REGISTER(&rr_goo_blind_r);
-	CVAR_REGISTER(&rr_goo_blind_g);
-	CVAR_REGISTER(&rr_goo_blind_b);
-	CVAR_REGISTER(&rr_goo_blind_blob_scale);
-	CVAR_REGISTER(&rr_goo_blind_blob_count);
-	CVAR_REGISTER(&rr_goo_victim_glow_amt);
+	CVAR_REGISTER(&rr_poison_aoe_radius);
+	CVAR_REGISTER(&rr_poison_veil_hold);
+	CVAR_REGISTER(&rr_poison_veil_fade);
+	CVAR_REGISTER(&rr_poison_veil_fadein);
+	CVAR_REGISTER(&rr_poison_veil_alpha);
+	CVAR_REGISTER(&rr_poison_veil_r);
+	CVAR_REGISTER(&rr_poison_veil_g);
+	CVAR_REGISTER(&rr_poison_veil_b);
+	CVAR_REGISTER(&rr_poison_veil_blob_scale);
+	CVAR_REGISTER(&rr_poison_veil_blob_count);
+	CVAR_REGISTER(&rr_poison_victim_glow_amt);
 
 	SERVER_COMMAND("exec relicrush_balance.cfg\n");
 	RelicRush_RefreshBalance();

@@ -77,7 +77,7 @@ target_sources(hl PRIVATE
 	relicrush_relic.cpp
 	relicrush_carrier.cpp
 	relicrush_config.cpp
-	relicrush_goo.cpp
+	relicrush_poison.cpp
 	nihilanth.cpp
 	nodes.cpp
 	observer.cpp
@@ -151,7 +151,7 @@ target_sources(hl PRIVATE
 	relicrush_gamerules.h
 	relicrush_relic.h
 	relicrush_carrier.h
-	relicrush_goo.h
+	relicrush_poison.h
 	hornet.h
 	items.h
 	monsterevent.h

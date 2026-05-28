@@ -32,13 +32,13 @@ DECLARE_MESSAGE(m_Health, Health)
 DECLARE_MESSAGE(m_Health, Damage)
 DECLARE_MESSAGE(m_Health, RelicCarr)
 DECLARE_MESSAGE(m_Health, RelicSyn)
-DECLARE_MESSAGE(m_Health, RelicGoo)
-DECLARE_MESSAGE(m_Health, RelicBlnd)
+DECLARE_MESSAGE(m_Health, RelicPoisn)
+DECLARE_MESSAGE(m_Health, RelicPsnVl)
 
 bool g_bRelicCarrierHUD = false;
 bool g_bRelicWallCling = false;
 int g_iRelicCarrierGlowAlpha = 0;
-int g_iRelicGooCooldownPct = 0; // 0 = vide/inactif, 100 = barre pleine (skill pret)
+int g_iRelicPoisonCooldownPct = 0; // 0 = vide/inactif, 100 = barre pleine (skill pret)
 
 #define PAIN_NAME "sprites/%d_pain.spr"
 #define DAMAGE_NAME "sprites/%d_dmg.spr"
@@ -66,8 +66,8 @@ bool CHudHealth::Init()
 	HOOK_MESSAGE(Damage);
 	HOOK_MESSAGE(RelicCarr);
 	HOOK_MESSAGE(RelicSyn);
-	HOOK_MESSAGE(RelicGoo);
-	HOOK_MESSAGE(RelicBlnd);
+	HOOK_MESSAGE(RelicPoisn);
+	HOOK_MESSAGE(RelicPsnVl);
 	m_iHealth = 100;
 	m_fFade = 0;
 	m_iFlags = 0;
@@ -88,8 +88,8 @@ void CHudHealth::Reset()
 	g_bRelicCarrierHUD = false;
 	g_bRelicWallCling = false;
 	g_iRelicCarrierGlowAlpha = 0;
-	g_iRelicGooCooldownPct = 0;
-	RelicRush_ResetGooBlindOverlay();
+	g_iRelicPoisonCooldownPct = 0;
+	RelicRush_ResetPoisonVeilOverlay();
 
 	// make sure the pain compass is cleared when the player respawns
 	m_fAttackFront = m_fAttackRear = m_fAttackRight = m_fAttackLeft = 0;
@@ -150,19 +150,19 @@ bool CHudHealth::MsgFunc_RelicCarr(const char* pszName, int iSize, void* pbuf)
 	return true;
 }
 
-bool CHudHealth::MsgFunc_RelicGoo(const char* pszName, int iSize, void* pbuf)
+bool CHudHealth::MsgFunc_RelicPoisn(const char* pszName, int iSize, void* pbuf)
 {
 	BEGIN_READ(pbuf, iSize);
-	g_iRelicGooCooldownPct = READ_BYTE();
-	if (g_iRelicGooCooldownPct < 0) g_iRelicGooCooldownPct = 0;
-	if (g_iRelicGooCooldownPct > 100) g_iRelicGooCooldownPct = 100;
+	g_iRelicPoisonCooldownPct = READ_BYTE();
+	if (g_iRelicPoisonCooldownPct < 0) g_iRelicPoisonCooldownPct = 0;
+	if (g_iRelicPoisonCooldownPct > 100) g_iRelicPoisonCooldownPct = 100;
 	return true;
 }
 
-bool CHudHealth::MsgFunc_RelicBlnd(const char* pszName, int iSize, void* pbuf)
+bool CHudHealth::MsgFunc_RelicPsnVl(const char* pszName, int iSize, void* pbuf)
 {
 	(void)pszName;
-	RelicRush_OnGooBlindMessage(iSize, pbuf);
+	RelicRush_OnPoisonVeilMessage(iSize, pbuf);
 	return true;
 }
 
