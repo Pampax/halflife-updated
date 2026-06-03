@@ -45,16 +45,6 @@ constexpr const char* RELIC_NORMAL_CROWBAR_WEAPONMODEL = "models/p_crowbar.mdl";
 constexpr int RELIC_CARRIER_CLAW_ATTACK_SEQ = 7; // CROWBAR_ATTACK3MISS
 constexpr float RELIC_CARRIER_CLAW_ANIM_FRAMERATE = 2.0f;
 
-inline bool RelicRush_IsCarrierMoving(CBasePlayer* pPlayer)
-{
-	if (!pPlayer)
-		return false;
-	const float thresh = g_RelicBalance.moveThresh;
-	const float vx = pPlayer->pev->velocity.x;
-	const float vy = pPlayer->pev->velocity.y;
-	return (vx * vx + vy * vy) >= (thresh * thresh);
-}
-
 void RelicRush_ResetCarrierVisuals(CBasePlayer* pPlayer);
 void RelicRush_FinalizeCarrierLoss(CBasePlayer* pPlayer);
 void RelicRush_RestorePlayMode(CBasePlayer* pPlayer);

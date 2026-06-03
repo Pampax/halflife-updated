@@ -21,8 +21,7 @@ constexpr float RELIC_POISON_SPLASH_DECAL_RADIUS = 140.0f;
 constexpr int RELIC_POISON_SPLASH_DECAL_MIN = 16;
 constexpr int RELIC_POISON_SPLASH_DECAL_MAX = 26;
 
-// Trainee projectile (TE_BEAMFOLLOW : duree segment = valeur * 0.1 s)
-constexpr int RELIC_POISON_TRAIL_LIFE = 12;
+// Trainee projectile (TE_BEAMFOLLOW : duree = rr_poison_trail_life * 0.1 s, defaut 6 = 0.6 s)
 
 // Voile client (taches vertes) : nombre max envoye par RelicPsnVl
 #define RELIC_POISON_VEIL_BLOBS_MAX 24

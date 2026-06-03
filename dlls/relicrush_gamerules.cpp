@@ -413,6 +413,14 @@ int CRelicRushMultiplay::IPointsForKill(CBasePlayer* pAttacker, CBasePlayer* pKi
 {
 	return 0;
 }
+
+float CRelicRushMultiplay::FlPlayerFallDamage(CBasePlayer* pPlayer)
+{
+	if (RelicRush_IsCarrier(pPlayer))
+		return 0.0f;
+	return CHalfLifeMultiplay::FlPlayerFallDamage(pPlayer);
+}
+
 void CRelicRushMultiplay::PlayerSpawn(CBasePlayer* pPlayer)
 {
 	CHalfLifeMultiplay::PlayerSpawn(pPlayer);
@@ -508,7 +516,7 @@ void CRelicRushMultiplay::TickCarrier(CBasePlayer* pPlayer)
 		pPlayer->m_flNextRelicRegen = gpGlobals->time + g_RelicBalance.regenInterval;
 
 		const float flDrain = g_RelicBalance.regenAmount;
-		if (flDrain > 0.0f && pPlayer->pev->health > 0.0f)
+		if (flDrain > 0.0f && pPlayer->pev->health > 5.0f)
 		{
 			pPlayer->pev->health = V_max(0.0f, pPlayer->pev->health - flDrain);
 			pPlayer->m_iClientHealth = -1;

@@ -302,7 +302,10 @@ void CRelicPoisonProjectile::StartGreenTrail()
 	WRITE_BYTE(TE_BEAMFOLLOW);
 	WRITE_SHORT(entindex());
 	WRITE_SHORT(g_sModelIndexLaser);
-	WRITE_BYTE(RELIC_POISON_TRAIL_LIFE);	// duree (*0.1s, ex. 40 = 4 s)
+	{
+		const int iTrailLife = (int)(g_RelicBalance.poisonTrailLife + 0.5f);
+		WRITE_BYTE(iTrailLife < 1 ? 1 : (iTrailLife > 255 ? 255 : iTrailLife)); // *0.1 s (6 = 0.6 s)
+	}
 	WRITE_BYTE(4);						// largeur
 	WRITE_BYTE((int)kRelicPoisonColor.x);	// r, g, b
 	WRITE_BYTE((int)kRelicPoisonColor.y);

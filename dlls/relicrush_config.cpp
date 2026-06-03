@@ -6,20 +6,20 @@
 #include "relicrush_config.h"
 
 RelicRushBalance g_RelicBalance = {
-	250.0f, 1.0f, 1.0f, 5.0f, 8.0f,
+	250.0f, 1.0f, 1.0f, 2.0f, 2.0f,
 	12.0f, 55.0f, 64.0f, 255.0f, 64.0f,
-	900.0f, 0.35f, 128.0f, 200.0f, -140.0f,
+	900.0f, 0.35f, 128.0f, 15.0f, 200.0f, -140.0f,
 	300.0f, 6.0f,
 	3.0f, 3.0f, 10.0f, 1.0f,
 	140.0f, 3.0f, 1.0f, 0.15f, 255.0f, 0.0f, 255.0f, 0.0f,
-	0.45f, 18.0f, 50.0f,
+	0.45f, 18.0f, 50.0f, 6.0f,
 };
 
 static cvar_t rr_maxhealth = {"rr_maxhealth", "250", FCVAR_SERVER};
 static cvar_t rr_regen_interval = {"rr_regen_interval", "1", FCVAR_SERVER};
 static cvar_t rr_regen_amount = {"rr_regen_amount", "1", FCVAR_SERVER};
-static cvar_t rr_crowbar_rate = {"rr_crowbar_rate", "5", FCVAR_SERVER};
-static cvar_t rr_move_thresh = {"rr_move_thresh", "8", FCVAR_SERVER};
+static cvar_t rr_crowbar_rate = {"rr_crowbar_rate", "2", FCVAR_SERVER};
+static cvar_t rr_siphon_mult = {"rr_siphon_mult", "2", FCVAR_SERVER};
 static cvar_t rr_stealth_renderamt = {"rr_stealth_renderamt", "12", FCVAR_SERVER};
 static cvar_t rr_glow_renderamt = {"rr_glow_renderamt", "55", FCVAR_SERVER};
 static cvar_t rr_glow_r = {"rr_glow_r", "64", FCVAR_SERVER};
@@ -28,6 +28,7 @@ static cvar_t rr_glow_b = {"rr_glow_b", "64", FCVAR_SERVER};
 static cvar_t rr_rush_speed = {"rr_rush_speed", "900", FCVAR_SERVER};
 static cvar_t rr_rush_cooldown = {"rr_rush_cooldown", "0.35", FCVAR_SERVER};
 static cvar_t rr_rush_trace = {"rr_rush_trace", "128", FCVAR_SERVER};
+static cvar_t rr_rush_pitch = {"rr_rush_pitch", "15", FCVAR_SERVER};
 static cvar_t rr_wall_up = {"rr_wall_up", "200", FCVAR_SERVER};
 static cvar_t rr_wall_down = {"rr_wall_down", "-140", FCVAR_SERVER};
 static cvar_t rr_round_length = {"rr_round_length", "300", FCVAR_SERVER};
@@ -47,6 +48,7 @@ static cvar_t rr_poison_veil_b = {"rr_poison_veil_b", "0", FCVAR_SERVER};
 static cvar_t rr_poison_veil_blob_scale = {"rr_poison_veil_blob_scale", "0.45", FCVAR_SERVER};
 static cvar_t rr_poison_veil_blob_count = {"rr_poison_veil_blob_count", "18", FCVAR_SERVER};
 static cvar_t rr_poison_victim_glow_amt = {"rr_poison_victim_glow_amt", "50", FCVAR_SERVER};
+static cvar_t rr_poison_trail_life = {"rr_poison_trail_life", "6", FCVAR_SERVER};
 
 #define RR_CLAMP_WARN_SLOTS 12
 
@@ -123,7 +125,7 @@ void RelicRush_RefreshBalance()
 	g_RelicBalance.regenInterval = RR_ClampCvar("rr_regen_interval", CVAR_GET_FLOAT("rr_regen_interval"), 0.25f, 30.0f);
 	g_RelicBalance.regenAmount = RR_ClampCvar("rr_regen_amount", CVAR_GET_FLOAT("rr_regen_amount"), 0.0f, 100.0f);
 	g_RelicBalance.crowbarRate = RR_ClampCvar("rr_crowbar_rate", CVAR_GET_FLOAT("rr_crowbar_rate"), 1.0f, 20.0f);
-	g_RelicBalance.moveThresh = RR_ClampCvar("rr_move_thresh", CVAR_GET_FLOAT("rr_move_thresh"), 1.0f, 64.0f);
+	g_RelicBalance.siphonMultiplier = RR_ClampCvar("rr_siphon_mult", CVAR_GET_FLOAT("rr_siphon_mult"), 0.0f, 10.0f);
 	g_RelicBalance.stealthRenderAmt = RR_ClampCvar("rr_stealth_renderamt", CVAR_GET_FLOAT("rr_stealth_renderamt"), 0.0f, 255.0f);
 	g_RelicBalance.glowRenderAmt = RR_ClampCvar("rr_glow_renderamt", CVAR_GET_FLOAT("rr_glow_renderamt"), 1.0f, 255.0f);
 	g_RelicBalance.glowR = RR_ClampCvar("rr_glow_r", CVAR_GET_FLOAT("rr_glow_r"), 0.0f, 255.0f);
@@ -132,6 +134,7 @@ void RelicRush_RefreshBalance()
 	g_RelicBalance.rushSpeed = RR_ClampCvar("rr_rush_speed", CVAR_GET_FLOAT("rr_rush_speed"), 100.0f, 2000.0f);
 	g_RelicBalance.rushCooldown = RR_ClampCvar("rr_rush_cooldown", CVAR_GET_FLOAT("rr_rush_cooldown"), 0.05f, 5.0f);
 	g_RelicBalance.rushTraceDist = RR_ClampCvar("rr_rush_trace", CVAR_GET_FLOAT("rr_rush_trace"), 32.0f, 512.0f);
+	g_RelicBalance.rushPitchOffset = RR_ClampCvar("rr_rush_pitch", CVAR_GET_FLOAT("rr_rush_pitch"), -45.0f, 45.0f);
 	g_RelicBalance.wallClimbUp = RR_ClampCvar("rr_wall_up", CVAR_GET_FLOAT("rr_wall_up"), 50.0f, 600.0f);
 	g_RelicBalance.wallClimbDown = RR_ClampCvar("rr_wall_down", CVAR_GET_FLOAT("rr_wall_down"), -600.0f, -50.0f);
 	g_RelicBalance.roundLengthSec = RR_ClampCvar("rr_round_length", CVAR_GET_FLOAT("rr_round_length"), 60.0f, 3600.0f);
@@ -153,6 +156,7 @@ void RelicRush_RefreshBalance()
 	g_RelicBalance.poisonVeilBlobScale = RR_ClampCvar("rr_poison_veil_blob_scale", CVAR_GET_FLOAT("rr_poison_veil_blob_scale"), 0.15f, 1.5f);
 	g_RelicBalance.poisonVeilBlobCount = RR_ClampCvar("rr_poison_veil_blob_count", CVAR_GET_FLOAT("rr_poison_veil_blob_count"), 1.0f, 24.0f);
 	g_RelicBalance.poisonVictimGlowAmt = RR_ClampCvar("rr_poison_victim_glow_amt", CVAR_GET_FLOAT("rr_poison_victim_glow_amt"), 1.0f, 255.0f);
+	g_RelicBalance.poisonTrailLife = RR_ClampCvar("rr_poison_trail_life", CVAR_GET_FLOAT("rr_poison_trail_life"), 1.0f, 255.0f);
 }
 
 void RelicRush_RegisterBalanceCvars()
@@ -161,7 +165,7 @@ void RelicRush_RegisterBalanceCvars()
 	CVAR_REGISTER(&rr_regen_interval);
 	CVAR_REGISTER(&rr_regen_amount);
 	CVAR_REGISTER(&rr_crowbar_rate);
-	CVAR_REGISTER(&rr_move_thresh);
+	CVAR_REGISTER(&rr_siphon_mult);
 	CVAR_REGISTER(&rr_stealth_renderamt);
 	CVAR_REGISTER(&rr_glow_renderamt);
 	CVAR_REGISTER(&rr_glow_r);
@@ -170,6 +174,7 @@ void RelicRush_RegisterBalanceCvars()
 	CVAR_REGISTER(&rr_rush_speed);
 	CVAR_REGISTER(&rr_rush_cooldown);
 	CVAR_REGISTER(&rr_rush_trace);
+	CVAR_REGISTER(&rr_rush_pitch);
 	CVAR_REGISTER(&rr_wall_up);
 	CVAR_REGISTER(&rr_wall_down);
 	CVAR_REGISTER(&rr_round_length);
@@ -189,6 +194,7 @@ void RelicRush_RegisterBalanceCvars()
 	CVAR_REGISTER(&rr_poison_veil_blob_scale);
 	CVAR_REGISTER(&rr_poison_veil_blob_count);
 	CVAR_REGISTER(&rr_poison_victim_glow_amt);
+	CVAR_REGISTER(&rr_poison_trail_life);
 
 	SERVER_COMMAND("exec relicrush_balance.cfg\n");
 	RelicRush_RefreshBalance();

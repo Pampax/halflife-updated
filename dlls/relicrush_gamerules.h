@@ -20,6 +20,7 @@ public:
 	void PlayerSpawn(CBasePlayer* pPlayer) override;
 	void PlayerKilled(CBasePlayer* pVictim, entvars_t* pKiller, entvars_t* pInflictor) override;
 	int IPointsForKill(CBasePlayer* pAttacker, CBasePlayer* pKilled) override;
+	float FlPlayerFallDamage(CBasePlayer* pPlayer) override;
 	bool CanHavePlayerItem(CBasePlayer* pPlayer, CBasePlayerItem* pItem) override;
 	bool CanHaveItem(CBasePlayer* pPlayer, CItem* pItem) override;
 	bool CanHaveAmmo(CBasePlayer* pPlayer, const char* pszAmmoName, int iMaxCarry) override;

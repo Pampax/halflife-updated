@@ -766,6 +766,13 @@ void RelicRush_CrowbarRush(CBasePlayer* pPlayer)
 
 	UTIL_MakeVectors(pPlayer->pev->v_angle);
 	Vector aim = gpGlobals->v_forward;
+	const float flPitchRad = g_RelicBalance.rushPitchOffset * (3.14159265f / 180.0f);
+	if (flPitchRad != 0.0f)
+	{
+		const float flCos = cosf(flPitchRad);
+		const float flSin = sinf(flPitchRad);
+		aim = aim * flCos + gpGlobals->v_up * flSin;
+	}
 	const float flLen = aim.Length();
 	if (flLen < 0.01f)
 		return;
@@ -891,8 +898,12 @@ void RelicRush_ApplySiphonHeal(CBasePlayer* pCarrier, CBasePlayer* pVictim, floa
 	if (!RelicRush_IsPlayerPoisoned(pVictim))
 		return;
 
+	const float flHeal = flDamageDealt * g_RelicBalance.siphonMultiplier;
+	if (flHeal <= 0.0f)
+		return;
+
 	pCarrier->m_bRelicAllowHeal = true;
-	pCarrier->TakeHealth(flDamageDealt, DMG_GENERIC);
+	pCarrier->TakeHealth(flHeal, DMG_GENERIC);
 	pCarrier->m_bRelicAllowHeal = false;
 	pCarrier->m_iClientHealth = -1;
 	RelicRush_SyncCarrierClient(pCarrier);

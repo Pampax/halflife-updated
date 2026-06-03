@@ -9,7 +9,7 @@ struct RelicRushBalance
 	float regenInterval;
 	float regenAmount;
 	float crowbarRate;
-	float moveThresh;
+	float siphonMultiplier; // soins griffes = degats * mult (victime empoisonnee)
 	float stealthRenderAmt;
 	float glowRenderAmt;
 	float glowR;
@@ -18,6 +18,7 @@ struct RelicRushBalance
 	float rushSpeed;
 	float rushCooldown;
 	float rushTraceDist;
+	float rushPitchOffset; // degres vers le haut par rapport a la visee (rr_rush_pitch)
 	float wallClimbUp;
 	float wallClimbDown;
 	float roundLengthSec;
@@ -38,6 +39,7 @@ struct RelicRushBalance
 	float poisonVeilBlobScale; // multiplicateur rayon des taches (client)
 	float poisonVeilBlobCount; // nombre de taches affichees (1..RELIC_POISON_VEIL_BLOBS_MAX)
 	float poisonVictimGlowAmt;  // halo vert sur le modele victime (renderamt)
+	float poisonTrailLife;      // trainee projectile (TE_BEAMFOLLOW, *0.1 s)
 };
 
 extern RelicRushBalance g_RelicBalance;
