@@ -42,6 +42,7 @@ struct RelicRushBalance
 	float poisonTrailLife;      // trainee projectile (TE_BEAMFOLLOW, *0.1 s)
 };
 
+// Copie des cvars rr_* ; rechargee par RefreshBalance (debut de manche, rr_reload_balance).
 extern RelicRushBalance g_RelicBalance;
 
 void RelicRush_RegisterBalanceCvars();

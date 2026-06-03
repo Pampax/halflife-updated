@@ -51,6 +51,8 @@ CRelicRushMultiplay::CRelicRushMultiplay()
 	PRECACHE_MODEL(RELIC_CARRIER_VIEWMODEL);
 	RelicRush_PrecacheModSounds();
 	RelicRush_PrecachePoisonAssets();
+
+	RelicRush_RefreshBalance();
 }
 
 void CRelicRushMultiplay::ClientUserInfoChanged(CBasePlayer* pPlayer, char* infobuffer)
@@ -104,7 +106,11 @@ void CRelicRushMultiplay::Think()
 	if (!m_bRoundActive)
 	{
 		if (m_flEarliestRoundStart <= 0.0f)
+		{
 			m_flEarliestRoundStart = gpGlobals->time + 2.0f;
+			// Apres game.cfg / listenserver.cfg (exec relicrush_balance.cfg).
+			RelicRush_RefreshBalance();
+		}
 
 		if (gpGlobals->time < m_flEarliestRoundStart)
 		{
@@ -124,6 +130,8 @@ void CRelicRushMultiplay::Think()
 }
 void CRelicRushMultiplay::StartRound()
 {
+	RelicRush_RefreshBalance();
+
 	m_bRoundActive = true;
 	m_bWaitingRestart = false;
 	m_pCarrier = nullptr;

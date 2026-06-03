@@ -5,35 +5,36 @@
 #include "util.h"
 #include "relicrush_config.h"
 
+// Valeurs initiales = relicrush_balance.cfg (gameplay lit g_RelicBalance apres RefreshBalance).
 RelicRushBalance g_RelicBalance = {
-	250.0f, 1.0f, 1.0f, 2.0f, 2.0f,
-	12.0f, 55.0f, 64.0f, 255.0f, 64.0f,
-	900.0f, 0.35f, 128.0f, 15.0f, 200.0f, -140.0f,
-	300.0f, 6.0f,
-	3.0f, 3.0f, 10.0f, 1.0f,
+	200.0f, 1.0f, 2.0f, 2.0f, 2.0f,
+	25.0f, 50.0f, 50.0f, 255.0f, 50.0f,
+	900.0f, 0.5f, 128.0f, 15.0f, 200.0f, -140.0f,
+	3600.0f, 6.0f,
+	1.0f, 3.0f, 10.0f, 1.0f,
 	140.0f, 3.0f, 1.0f, 0.15f, 255.0f, 0.0f, 255.0f, 0.0f,
-	0.45f, 18.0f, 50.0f, 6.0f,
+	1.5f, 24.0f, 50.0f, 6.0f,
 };
 
-static cvar_t rr_maxhealth = {"rr_maxhealth", "250", FCVAR_SERVER};
+static cvar_t rr_maxhealth = {"rr_maxhealth", "200", FCVAR_SERVER};
 static cvar_t rr_regen_interval = {"rr_regen_interval", "1", FCVAR_SERVER};
-static cvar_t rr_regen_amount = {"rr_regen_amount", "1", FCVAR_SERVER};
+static cvar_t rr_regen_amount = {"rr_regen_amount", "2", FCVAR_SERVER};
 static cvar_t rr_crowbar_rate = {"rr_crowbar_rate", "2", FCVAR_SERVER};
 static cvar_t rr_siphon_mult = {"rr_siphon_mult", "2", FCVAR_SERVER};
-static cvar_t rr_stealth_renderamt = {"rr_stealth_renderamt", "12", FCVAR_SERVER};
-static cvar_t rr_glow_renderamt = {"rr_glow_renderamt", "55", FCVAR_SERVER};
-static cvar_t rr_glow_r = {"rr_glow_r", "64", FCVAR_SERVER};
+static cvar_t rr_stealth_renderamt = {"rr_stealth_renderamt", "25", FCVAR_SERVER};
+static cvar_t rr_glow_renderamt = {"rr_glow_renderamt", "50", FCVAR_SERVER};
+static cvar_t rr_glow_r = {"rr_glow_r", "50", FCVAR_SERVER};
 static cvar_t rr_glow_g = {"rr_glow_g", "255", FCVAR_SERVER};
-static cvar_t rr_glow_b = {"rr_glow_b", "64", FCVAR_SERVER};
+static cvar_t rr_glow_b = {"rr_glow_b", "50", FCVAR_SERVER};
 static cvar_t rr_rush_speed = {"rr_rush_speed", "900", FCVAR_SERVER};
-static cvar_t rr_rush_cooldown = {"rr_rush_cooldown", "0.35", FCVAR_SERVER};
+static cvar_t rr_rush_cooldown = {"rr_rush_cooldown", "0.5", FCVAR_SERVER};
 static cvar_t rr_rush_trace = {"rr_rush_trace", "128", FCVAR_SERVER};
 static cvar_t rr_rush_pitch = {"rr_rush_pitch", "15", FCVAR_SERVER};
 static cvar_t rr_wall_up = {"rr_wall_up", "200", FCVAR_SERVER};
 static cvar_t rr_wall_down = {"rr_wall_down", "-140", FCVAR_SERVER};
-static cvar_t rr_round_length = {"rr_round_length", "300", FCVAR_SERVER};
+static cvar_t rr_round_length = {"rr_round_length", "3600", FCVAR_SERVER};
 static cvar_t rr_round_restart = {"rr_round_restart", "6", FCVAR_SERVER};
-static cvar_t rr_visible_time = {"rr_visible_time", "3", FCVAR_SERVER};
+static cvar_t rr_visible_time = {"rr_visible_time", "1", FCVAR_SERVER};
 static cvar_t rr_sound_min = {"rr_sound_min", "3", FCVAR_SERVER};
 static cvar_t rr_sound_max = {"rr_sound_max", "10", FCVAR_SERVER};
 static cvar_t rr_stealth_fade = {"rr_stealth_fade", "1", FCVAR_SERVER};
@@ -45,8 +46,8 @@ static cvar_t rr_poison_veil_alpha = {"rr_poison_veil_alpha", "255", FCVAR_SERVE
 static cvar_t rr_poison_veil_r = {"rr_poison_veil_r", "0", FCVAR_SERVER};
 static cvar_t rr_poison_veil_g = {"rr_poison_veil_g", "255", FCVAR_SERVER};
 static cvar_t rr_poison_veil_b = {"rr_poison_veil_b", "0", FCVAR_SERVER};
-static cvar_t rr_poison_veil_blob_scale = {"rr_poison_veil_blob_scale", "0.45", FCVAR_SERVER};
-static cvar_t rr_poison_veil_blob_count = {"rr_poison_veil_blob_count", "18", FCVAR_SERVER};
+static cvar_t rr_poison_veil_blob_scale = {"rr_poison_veil_blob_scale", "1.5", FCVAR_SERVER};
+static cvar_t rr_poison_veil_blob_count = {"rr_poison_veil_blob_count", "24", FCVAR_SERVER};
 static cvar_t rr_poison_victim_glow_amt = {"rr_poison_victim_glow_amt", "50", FCVAR_SERVER};
 static cvar_t rr_poison_trail_life = {"rr_poison_trail_life", "6", FCVAR_SERVER};
 
@@ -196,8 +197,9 @@ void RelicRush_RegisterBalanceCvars()
 	CVAR_REGISTER(&rr_poison_victim_glow_amt);
 	CVAR_REGISTER(&rr_poison_trail_life);
 
-	SERVER_COMMAND("exec relicrush_balance.cfg\n");
-	RelicRush_RefreshBalance();
+	// relicrush_balance.cfg est execute par game.cfg / listenserver.cfg / server.cfg.
+	// Ne pas RefreshBalance ici : trop tot (avant exec cfg) et RefreshSkillData du mod
+	// n'est pas appele depuis le constructeur CHalfLifeMultiplay.
 }
 
 void RelicRush_RegisterServerCommands()
