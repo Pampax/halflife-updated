@@ -170,7 +170,8 @@ if (MSVC)
 endif()
 
 # Set install paths to the user-defined mod directory
-# Relic Rush : mod serveur uniquement (client Steam vanilla via liblist cldll "0")
+# Relic Rush ship bien un client.dll (3e personne rr_cam + viewmodel couteau), mais il est
+# copie par deploy_relicrush.ps1, pas par 'install' ici : on n'installe donc que hl.
 # install(TARGETS client RUNTIME DESTINATION cl_dlls LIBRARY DESTINATION cl_dlls)
 
 install(TARGETS hl
