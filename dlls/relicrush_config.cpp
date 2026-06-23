@@ -4,6 +4,7 @@
 #include "extdll.h"
 #include "util.h"
 #include "relicrush_config.h"
+#include "relicrush_clamp.h"
 
 // Valeurs initiales = relicrush_balance.cfg (gameplay lit g_RelicBalance apres RefreshBalance).
 RelicRushBalance g_RelicBalance = {
@@ -51,65 +52,23 @@ static cvar_t rr_poison_veil_blob_count = {"rr_poison_veil_blob_count", "24", FC
 static cvar_t rr_poison_victim_glow_amt = {"rr_poison_victim_glow_amt", "50", FCVAR_SERVER};
 static cvar_t rr_poison_trail_life = {"rr_poison_trail_life", "6", FCVAR_SERVER};
 
-#define RR_CLAMP_WARN_SLOTS 12
-
-static struct
-{
-	char szName[32];
-} s_rrClampWarned[RR_CLAMP_WARN_SLOTS];
-
-static bool RR_ClampAlreadyWarned(const char* name)
-{
-	for (int i = 0; i < RR_CLAMP_WARN_SLOTS; i++)
-	{
-		if (s_rrClampWarned[i].szName[0] == '\0')
-			return false;
-		if (!stricmp(s_rrClampWarned[i].szName, name))
-			return true;
-	}
-	return false;
-}
-
-static void RR_ClampMarkWarned(const char* name)
-{
-	for (int i = 0; i < RR_CLAMP_WARN_SLOTS; i++)
-	{
-		if (s_rrClampWarned[i].szName[0] == '\0' || !stricmp(s_rrClampWarned[i].szName, name))
-		{
-			strncpy(s_rrClampWarned[i].szName, name, sizeof(s_rrClampWarned[i].szName) - 1);
-			s_rrClampWarned[i].szName[sizeof(s_rrClampWarned[i].szName) - 1] = '\0';
-			return;
-		}
-	}
-}
+// Clamp pur + dedup des avertissements : voir relicrush_clamp.h/.cpp (testable sans le moteur).
+static RRClampWarnTracker s_rrClampWarned;
 
 static float RR_ClampCvar(const char* name, float value, float minVal, float maxVal)
 {
-	if (value < minVal)
+	float clamped = RR_ClampValue(value, minVal, maxVal);
+	if (clamped != value && !s_rrClampWarned.AlreadyWarned(name))
 	{
-		if (!RR_ClampAlreadyWarned(name))
-		{
-			ALERT(at_console, "Relic Rush: %s=%g trop bas, clamp %g\n", name, value, minVal);
-			RR_ClampMarkWarned(name);
-		}
-		return minVal;
+		ALERT(at_console, "Relic Rush: %s=%g %s, clamp %g\n", name, value, value < minVal ? "trop bas" : "trop haut", clamped);
+		s_rrClampWarned.MarkWarned(name);
 	}
-	if (value > maxVal)
-	{
-		if (!RR_ClampAlreadyWarned(name))
-		{
-			ALERT(at_console, "Relic Rush: %s=%g trop haut, clamp %g\n", name, value, maxVal);
-			RR_ClampMarkWarned(name);
-		}
-		return maxVal;
-	}
-	return value;
+	return clamped;
 }
 
 static void RelicRush_ClearClampWarnings()
 {
-	for (int i = 0; i < RR_CLAMP_WARN_SLOTS; i++)
-		s_rrClampWarned[i].szName[0] = '\0';
+	s_rrClampWarned.Clear();
 }
 
 static void RelicRush_ReloadBalanceCmd()

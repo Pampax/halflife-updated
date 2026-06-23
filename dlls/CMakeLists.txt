@@ -77,6 +77,7 @@ target_sources(hl PRIVATE
 	relicrush_relic.cpp
 	relicrush_carrier.cpp
 	relicrush_config.cpp
+	relicrush_clamp.cpp
 	relicrush_poison.cpp
 	nihilanth.cpp
 	nodes.cpp
@@ -151,6 +152,7 @@ target_sources(hl PRIVATE
 	relicrush_gamerules.h
 	relicrush_relic.h
 	relicrush_carrier.h
+	relicrush_clamp.h
 	relicrush_poison.h
 	hornet.h
 	items.h
@@ -224,3 +226,7 @@ target_sources(hl PRIVATE
 	../pm_shared/pm_shared.h
 
 	../public/interface.h)
+
+if(HalfLife_BUILD_TESTS)
+	add_subdirectory(tests)
+endif()

@@ -1,60 +1,56 @@
 name: CI/CD
 
+# Aligne la CI sur le vrai flux de build du mod : CMake (cmake -B build -A Win32),
+# le meme que deploy_relicrush.ps1. Les anciens jobs compilaient linux/Makefile et
+# projects/vs2019/projects.sln, qui ne referencent AUCUNE source relicrush_*.cpp :
+# ils ne compilaient donc jamais le code du mod et ne pouvaient catcher aucune regression.
+
 on: [push, pull_request]
 
 jobs:
-  linux:
-    name: Linux-x86
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        compiler: [g++, clang++]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      
-      - name: Install G++ Multilib, Clang++ & OpenGL library
-        run: |
-          sudo apt update
-          sudo apt install -y g++-multilib clang libgl1-mesa-dev
-      
-      - name: Build
-        run: |
-          cd linux
-          make COMPILER=${{ matrix.compiler }} CFG=release -j2
-      
-      - name: Deploy
-        uses: actions/upload-artifact@v4
-        with:
-          name: Linux-x86-${{ matrix.compiler }}
-          path: |
-            linux/release/client.so
-            linux/release/client.so.dbg
-            linux/release/hl.so
-            linux/release/hl.so.dbg
-      
-  win32:
-    name: Win32
+  windows:
+    name: Windows (CMake Win32)
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
-        with:
-          msbuild-architecture: x86
-      
-      - name: Build
-        run: msbuild projects/vs2019/projects.sln -t:rebuild -property:Configuration=Release -maxcpucount:2
-      
-      - name: Deploy
+
+      # Le mod est server-only ; install/relicrush sert juste a satisfaire la contrainte
+      # "CMAKE_INSTALL_PREFIX doit pointer vers un dossier de mod" (pas de cmake --install ici).
+      - name: Configure (CMake, Win32)
+        run: cmake -B build -A Win32 -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install/relicrush"
+
+      - name: Build (Release) — hl + client + tests
+        run: cmake --build build --config Release
+
+      - name: Unit tests (ctest)
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Upload mod libraries
         uses: actions/upload-artifact@v4
         with:
-          name: Win32
+          name: relicrush-win32
           path: |
-            projects/vs2019/Release/hl_cdll/client.dll
-            projects/vs2019/Release/hl_cdll/client.pdb
-            projects/vs2019/Release/hldll/hl.dll
-            projects/vs2019/Release/hldll/hl.pdb
-      
+            build/dlls/Release/hl.dll
+            build/dlls/Release/hl.pdb
+            build/cl_dll/Release/client.dll
+            build/cl_dll/Release/client.pdb
+
+  linux-tests:
+    name: Linux (clamp unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # relicrush_clamp_tests est volontairement sans dependance au moteur Half-Life :
+      # il compile et tourne en natif (pas de toolchain 32-bit, pas d'OpenGL requis),
+      # ce qui donne une couverture cross-platform fiable de la validation des cvars.
+      - name: Configure (CMake, native)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install/relicrush"
+
+      - name: Build tests
+        run: cmake --build build --target relicrush_clamp_tests
+
+      - name: Unit tests (ctest)
+        run: ctest --test-dir build --output-on-failure

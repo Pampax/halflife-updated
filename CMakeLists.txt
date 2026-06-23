@@ -38,9 +38,14 @@ cmake_path(GET CMAKE_INSTALL_PREFIX STEM MOD_NAME)
 set(HalfLife_HLDS_DIRECTORY "" CACHE PATH "Path to the Half-Life Dedicated Server directory. Must be specified to automatically set up dedicated server debugging settings and to copy libraries")
 
 option(HalfLife_LTO "Enable Link-Time Optimization" OFF)
+option(HalfLife_BUILD_TESTS "Build unit tests that don't require the Half-Life engine (e.g. relicrush_clamp_tests)" ON)
 
 if(HalfLife_LTO)
 	check_ipo_supported()
+endif()
+
+if(HalfLife_BUILD_TESTS)
+	enable_testing()
 endif()
 
 # Sets properties common to all projects
